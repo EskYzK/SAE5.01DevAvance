@@ -1,6 +1,4 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:school_object_detector/screens/camera_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -23,25 +21,38 @@ class HomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const SizedBox(height: 50),
-                const Icon(
-                  Icons.photo_camera_outlined,
-                  size: 90,
-                  color: Colors.white,
+                const SizedBox(height: 60),
+
+                //  Logo central stylisé
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.15),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                  ),
+                  child: const Icon(
+                    Icons.school_rounded,
+                    color: Colors.white,
+                    size: 70,
+                  ),
                 ),
                 const SizedBox(height: 25),
+
+                //  Titre principal
                 const Text(
-                  "Object Detector",
+                  "Reconnaissance d’objets scolaires",
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 30,
+                    fontSize: 26,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: 1.1,
+                    letterSpacing: 0.8,
                   ),
+                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  "Analysez vos images instantanément",
+                  "Identifiez instantanément les objets du quotidien en classe",
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 16,
@@ -49,41 +60,42 @@ class HomeScreen extends StatelessWidget {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const Spacer(),
-                _glassButton(
+
+                const SizedBox(height: 70),
+
+                //  Boutons d’action
+                _mainButton(
                   context,
                   label: "Détection en temps réel",
                   icon: Icons.videocam_outlined,
-                  onTap: () async {
-                    final imagePath = await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const CameraScreen()),
-                    );
-                    if (imagePath != null) {
-                      // Affiche le chemin de l'image capturée
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Photo capturée : $imagePath')),
-                      );
-                    }
-                  },
+                  color: Colors.white,
+                  textColor: const Color(0xFF6A11CB),
+                  onTap: () => Navigator.pushNamed(context, '/camera'),
                 ),
                 const SizedBox(height: 20),
-                _glassButton(
+
+                _mainButton(
                   context,
                   label: "Analyser une image enregistrée",
                   icon: Icons.image_outlined,
+                  color: Colors.white,
+                  textColor: const Color(0xFF2575FC),
                   onTap: () => Navigator.pushNamed(context, '/gallery'),
                 ),
                 const SizedBox(height: 20),
+
                 _outlineButton(
                   context,
                   label: "Voir l’historique",
                   icon: Icons.history_outlined,
                   onTap: () => Navigator.pushNamed(context, '/history'),
                 ),
+
                 const Spacer(),
+
+                // 🧾 Footer
                 const Text(
-                  "v1.0 • Flutter Dev Team",
+                  "v1.0 • Équipe Flutter | Université de Lorraine",
                   style: TextStyle(
                     color: Colors.white54,
                     fontSize: 13,
@@ -98,56 +110,51 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // 🌫️ Bouton glass effect
-  static Widget _glassButton(
+  //  Bouton principal
+  static Widget _mainButton(
     BuildContext context, {
     required String label,
     required IconData icon,
+    required Color color,
+    required Color textColor,
     required VoidCallback onTap,
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(25),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(25),
-              border: Border.all(color: Colors.white.withOpacity(0.3)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  offset: const Offset(0, 4),
-                  blurRadius: 10,
-                ),
-              ],
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              offset: const Offset(0, 4),
+              blurRadius: 10,
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, color: Colors.white, size: 22),
-                const SizedBox(width: 10),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: textColor, size: 20),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 
-  // ⚪ Bouton outline
+  //  Bouton outline
   static Widget _outlineButton(
     BuildContext context, {
     required String label,
@@ -158,21 +165,21 @@ class HomeScreen extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(25),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: Colors.white, width: 1.8),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: Colors.white, size: 22),
+            Icon(icon, color: Colors.white, size: 18),
             const SizedBox(width: 10),
             Text(
               label,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 17,
+                fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
             ),

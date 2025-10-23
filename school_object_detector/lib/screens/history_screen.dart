@@ -9,10 +9,28 @@ class HistoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Historique des images"),
-        backgroundColor: Colors.deepPurple,
+    appBar: AppBar(
+      title: const Text("Analyse d'image"),
+      centerTitle: true,
+      elevation: 0,
+      // Remplace la couleur unie par le même gradient que la Home
+      flexibleSpace: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
       ),
+      foregroundColor: Colors.white,
+      titleTextStyle: const TextStyle(
+        color: Colors.white,
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+
       body: images.isEmpty
           ? const Center(
               child: Text(
