@@ -13,7 +13,6 @@ class HistoryScreen extends StatelessWidget {
       title: const Text("Analyse d'image"),
       centerTitle: true,
       elevation: 0,
-      // Remplace la couleur unie par le même gradient que la Home
       flexibleSpace: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(

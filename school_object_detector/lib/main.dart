@@ -17,15 +17,13 @@ class ObjectDetectorApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Reconnaissance d\'objets scolaires',
       theme: ThemeData(
-        // 🎨 Thème principal inspiré d’un bleu-violet “éducation / IA”
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6A11CB), // violet principal
+          seedColor: const Color(0xFF6A11CB), 
           brightness: Brightness.light,
         ),
         scaffoldBackgroundColor: const Color(0xFFF6F8FB),
         useMaterial3: true,
 
-        // 🧱 AppBar et texte harmonisés
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFF6A11CB),
           foregroundColor: Colors.white,
@@ -68,7 +66,6 @@ class ObjectDetectorApp extends StatelessWidget {
         ),
       ),
 
-      // 🗺️ Gestion complète des routes
       initialRoute: '/',
       routes: {
         '/': (context) => const HomeScreen(),

@@ -104,13 +104,11 @@ class _CameraScreenState extends State<CameraScreen> {
 
     return Scaffold(
       body: SizedBox.expand(
-        // 👈 prend tout l’écran
         child: Stack(
-          fit: StackFit.expand, // 👈 étire tous les enfants sur tout l’espace
+          fit: StackFit.expand, 
           children: [
-            // 📷 La caméra en plein écran
             FittedBox(
-              fit: BoxFit.cover, // 👈 couvre toute la surface sans déformation
+              fit: BoxFit.cover, 
               child: SizedBox(
                 width: _controller!.value.previewSize?.height ?? 0,
                 height: _controller!.value.previewSize?.width ?? 0,
@@ -118,7 +116,7 @@ class _CameraScreenState extends State<CameraScreen> {
               ),
             ),
 
-            // 🔙 Bouton retour
+            //  Bouton retour
             Positioned(
               top: 40,
               left: 20,
@@ -148,7 +146,7 @@ class _CameraScreenState extends State<CameraScreen> {
               ),
             ),
 
-            // 🔄 Bouton switch caméra
+            //  Bouton switch caméra
             Positioned(
               top: 40,
               right: 20,

@@ -56,7 +56,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
             children: [
               const SizedBox(height: 20),
 
-              // 📷 Zone d'affichage
               Expanded(
                 child: Center(
                   child: _selectedImage == null
@@ -102,7 +101,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
               const SizedBox(height: 30),
 
-              //  Bouton : Choisir une image
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -126,7 +124,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
               const SizedBox(height: 15),
 
-              //  Bouton : Analyser
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(

@@ -23,7 +23,6 @@ class HomeScreen extends StatelessWidget {
               children: [
                 const SizedBox(height: 60),
 
-                //  Logo central stylisé
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -39,7 +38,6 @@ class HomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 25),
 
-                //  Titre principal
                 const Text(
                   "Reconnaissance d’objets scolaires",
                   style: TextStyle(
@@ -63,7 +61,6 @@ class HomeScreen extends StatelessWidget {
 
                 const SizedBox(height: 70),
 
-                //  Boutons d’action
                 _mainButton(
                   context,
                   label: "Détection en temps réel",
@@ -93,7 +90,6 @@ class HomeScreen extends StatelessWidget {
 
                 const Spacer(),
 
-                // 🧾 Footer
                 const Text(
                   "v1.0 • Équipe Flutter | Université de Lorraine",
                   style: TextStyle(
@@ -110,7 +106,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  //  Bouton principal
   static Widget _mainButton(
     BuildContext context, {
     required String label,
@@ -154,7 +149,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  //  Bouton outline
   static Widget _outlineButton(
     BuildContext context, {
     required String label,
