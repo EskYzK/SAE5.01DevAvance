@@ -158,27 +158,39 @@ class _CameraScreenState extends State<CameraScreen> {
               ),
             ),
 
-            // Texte décoratif en bas
+            // Bouton capture d'image avec effet flash
             Positioned(
-              bottom: 35,
+              bottom: 40,
               left: 0,
               right: 0,
               child: Center(
-                child: RichText(
-                  text: const TextSpan(
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                    ),
-                    children: [
-                      TextSpan(text: "Analyse en temps réel - "),
-                      TextSpan(
-                        text: "Matériel scolaire",
-                        style: TextStyle(color: Color(0xFFB0E2FF)),
-                      ),
-                    ],
-                  ),
+                child: FloatingActionButton(
+                  heroTag: 'CaptureButton',
+                  backgroundColor: const Color(0xFF6A11CB),
+                  onPressed: () async {
+                    if (_controller != null && _controller!.value.isInitialized) {
+                      final picture = await _controller!.takePicture();
+                      OverlayEntry? flashOverlay;
+                      flashOverlay = OverlayEntry(
+                        builder: (context) => Container(
+                          color: Colors.white.withValues(alpha: .6),
+                        ),
+                      );
+                      Overlay.of(context).insert(flashOverlay);
+                      await Future.delayed(const Duration(milliseconds: 150));
+                      flashOverlay.remove();
+
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Image capturée : ${picture.path}'),
+                            backgroundColor: const Color(0xFF6A11CB),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: const Icon(Icons.camera_alt, color: Colors.white),
                 ),
               ),
             ),
