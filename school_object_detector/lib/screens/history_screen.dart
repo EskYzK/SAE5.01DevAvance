@@ -33,7 +33,7 @@ class HistoryScreen extends StatelessWidget {
       body: images.isEmpty
           ? const Center(
               child: Text(
-                "Aucune image enregistrée",
+                "Aucune détection récente",
                 style: TextStyle(fontSize: 18),
               ),
             )

@@ -133,7 +133,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                             const SnackBar(
                               backgroundColor: Color(0xFF6A11CB),
                               content: Text(
-                                "Analyse simulée en cours...",
+                                "Analyse en cours...",
                                 style: TextStyle(color: Colors.white),
                               ),
                               duration: Duration(seconds: 2),
