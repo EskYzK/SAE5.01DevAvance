@@ -1,29 +1,43 @@
 import tensorflow as tf
-from tensorflow import keras
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras import layers, models
 
-# Chargement du dataset MNIST (chiffres manuscrits 0–9)
-(x_train, y_train), (x_test, y_test) = keras.datasets.mnist.load_data()
+# Préparation du dataset
+datagen = ImageDataGenerator(
+    rescale=1./255,
+    validation_split=0.2
+)
 
-# Normalisation
-x_train = x_train / 255.0
-x_test = x_test / 255.0
+train = datagen.flow_from_directory(
+    'dataset',
+    target_size=(224, 224),
+    batch_size=32,
+    subset='training'
+)
 
-# Création du modèle
-model = keras.Sequential([
-    keras.layers.Flatten(input_shape=(28, 28)),
-    keras.layers.Dense(128, activation='relu'),
-    keras.layers.Dropout(0.2),
-    keras.layers.Dense(10, activation='softmax')
+val = datagen.flow_from_directory(
+    'dataset',
+    target_size=(224, 224),
+    batch_size=32,
+    subset='validation'
+)
+
+# Modèle basé sur MobileNetV2
+base_model = MobileNetV2(weights='imagenet', include_top=False, input_shape=(224,224,3))
+base_model.trainable = False  # on gèle les couches de base
+
+model = models.Sequential([
+    base_model,
+    layers.GlobalAveragePooling2D(),
+    layers.Dense(len(train.class_indices), activation='softmax')
 ])
 
-# Compilation et entraînement
-model.compile(optimizer='adam',
-              loss='sparse_categorical_crossentropy',
-              metrics=['accuracy'])
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
-model.fit(x_train, y_train, epochs=5)
-model.evaluate(x_test, y_test)
+# Entraînement
+model.fit(train, validation_data=val, epochs=10)
 
-# Sauvegarde du modèle
-model.save("digit_model.h5")
-print("✅ Modèle entraîné et sauvegardé avec succès !")
+# Sauvegarde
+model.save("school_model.h5")
+print("✅ Modèle 'school_model.h5' entraîné et sauvegardé avec succès !")
