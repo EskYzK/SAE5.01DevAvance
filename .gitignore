@@ -10,3 +10,10 @@ __pycache__/
 *.pyc
 .DS_Store
 .vscode/
+
+# Fichiers lourds à ignorer
+*.pt
+*.tflite
+runs/
+dataset/
+__pycache__/
