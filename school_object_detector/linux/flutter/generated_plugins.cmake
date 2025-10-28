@@ -20,4 +20,8 @@ endforeach(plugin)
 foreach(ffi_plugin ${FLUTTER_FFI_PLUGIN_LIST})
   add_subdirectory(flutter/ephemeral/.plugin_symlinks/${ffi_plugin}/linux plugins/${ffi_plugin})
   list(APPEND PLUGIN_BUNDLED_LIBRARIES ${${ffi_plugin}_bundled_libraries})
+<<<<<<< HEAD
 endforeach(ffi_plugin)
+=======
+endforeach(ffi_plugin)
+>>>>>>> c714d4ab47672b920a9c1b20650ec37839bf4c92
