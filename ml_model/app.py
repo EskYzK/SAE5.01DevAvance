@@ -1,40 +1,45 @@
-from flask import Flask, jsonify
+from flask import Flask, request, jsonify
 from ultralytics import YOLO
 import cv2
+import numpy as np
+import base64
+import io
+from PIL import Image
 
 app = Flask(__name__)
 
-# Charger le modèle YOLOv8
-model = YOLO("runs/detect/school_objects_yolov8/weights/best.pt")
+# Chargement du modèle entraîné
+model = YOLO("../runs/detect/school_objects_yolov8/weights/best.pt")  # ton modèle YOLO entraîné
 
-@app.route("/detect", methods=["GET"])
-def detect_objects():
-    cap = cv2.VideoCapture(0)
-    ret, frame = cap.read()
-    cap.release()
+@app.route("/detect", methods=["POST"])
+def detect():
+    try:
+        # Récupération de l'image encodée en base64 depuis Flutter
+        data = request.json
+        image_b64 = data["image"]
+        image_bytes = base64.b64decode(image_b64)
+        image = Image.open(io.BytesIO(image_bytes))
+        frame = np.array(image)
 
-    if not ret:
-        return jsonify({"error": "Impossible de capturer une image."}), 500
+        # Exécution du modèle YOLO
+        results = model.predict(source=frame, conf=0.5, verbose=False)
 
-    # Détection
-    results = model(frame)
+        # Extraction des prédictions
+        detections = []
+        for box in results[0].boxes:
+            cls_id = int(box.cls[0])
+            label = model.names[cls_id]
+            conf = float(box.conf[0])
+            detections.append({
+                "label": label,
+                "confidence": round(conf, 2)
+            })
 
-    detected_objects = []
-    for box in results[0].boxes:
-        cls = int(box.cls[0])
-        label = model.names[cls]
-        conf = float(box.conf[0])
-        x1, y1, x2, y2 = map(int, box.xyxy[0])
-        detected_objects.append({
-            "label": label,
-            "confidence": round(conf, 2),
-            "bbox": [x1, y1, x2, y2]
-        })
+        return jsonify({"detections": detections})
 
-    return jsonify({
-        "nb_objets": len(detected_objects),
-        "objets": detected_objects
-    })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5001)
