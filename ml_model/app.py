@@ -9,7 +9,7 @@ from PIL import Image
 app = Flask(__name__)
 
 # Chargement du modèle entraîné
-model = YOLO("../runs/detect/school_objects_yolov8/weights/best.pt")  # ton modèle YOLO entraîné
+model = YOLO("./runs/detect/school_objects_yolov8/weights/best.pt")  # ton modèle YOLO entraîné
 
 @app.route("/detect", methods=["POST"])
 def detect():
