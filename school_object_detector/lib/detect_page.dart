@@ -39,12 +39,19 @@ class _DetectPageState extends State<DetectPage> {
       final bytes = await image.readAsBytes();
       final base64Image = base64Encode(bytes);
 
+      // Debug: log taille et url
+      debugPrint('Envoi de l\'image vers $apiUrl (${bytes.length} octets)');
+
       // Envoyer au serveur Flask
       final response = await http.post(
         Uri.parse(apiUrl),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"image": base64Image}),
       );
+
+      // Debug: log réponse
+      debugPrint('Réponse serveur: ${response.statusCode}');
+      debugPrint('Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -61,10 +68,12 @@ class _DetectPageState extends State<DetectPage> {
       } else {
         setState(() {
           _resultText =
-              "Erreur serveur : ${response.statusCode} ${response.reasonPhrase}";
+              "Erreur serveur : ${response.statusCode} ${response.reasonPhrase}\n${response.body}";
         });
       }
     } catch (e) {
+      // Log complet de l'exception pour Xcode/console
+      debugPrint('Erreur lors de l\'envoi: $e');
       setState(() {
         _resultText = "Erreur : $e";
       });
