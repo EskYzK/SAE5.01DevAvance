@@ -251,7 +251,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
   Future<void> _sendJpegBytes(Uint8List bytes) async {
     try {
-      final uri = Uri.parse('http://10.11.123.248:5001/predict');
+      final uri = Uri.parse('http://172.20.10.9:5001/predict');
 
       final request = http.MultipartRequest('POST', uri)
         ..files.add(
