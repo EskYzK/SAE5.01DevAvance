@@ -507,6 +507,15 @@ class _DetectionsPainter extends CustomPainter {
         double x2 = (bbox['x2'] ?? 0).toDouble();
         double y2 = (bbox['y2'] ?? 0).toDouble();
 
+        // 🔹 Réduire légèrement les boîtes pour mieux ajuster les objets (15% de réduction)
+        final double boxWidth = x2 - x1;
+        final double boxHeight = y2 - y1;
+        final double shrinkFactor = 0.15;
+        x1 += boxWidth * shrinkFactor / 2;
+        y1 += boxHeight * shrinkFactor / 2;
+        x2 -= boxWidth * shrinkFactor / 2;
+        y2 -= boxHeight * shrinkFactor / 2;
+
         if (isFront) {
           final double nx1 = 1.0 - x2;
           final double nx2 = 1.0 - x1;

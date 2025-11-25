@@ -1,6 +1,9 @@
 import 'dart:io';
+import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
 
 class GalleryScreen extends StatefulWidget {
   const GalleryScreen({super.key});
@@ -11,14 +14,81 @@ class GalleryScreen extends StatefulWidget {
 
 class _GalleryScreenState extends State<GalleryScreen> {
   File? _selectedImage;
+  String _resultText = "";
+  bool _isAnalyzing = false;
+
+  // 🔗 URL du serveur Flask
+  final String apiUrl = "http://172.20.10.9:5001/detect";
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery);
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
 
     if (picked != null) {
       setState(() {
         _selectedImage = File(picked.path);
+        _resultText = "";
+      });
+    }
+  }
+
+  Future<void> _analyzeImage() async {
+    if (_selectedImage == null) return;
+
+    setState(() {
+      _isAnalyzing = true;
+      _resultText = "Analyse en cours...";
+    });
+
+    try {
+      final bytes = await _selectedImage!.readAsBytes();
+      final base64Image = base64Encode(bytes);
+
+      debugPrint('Envoi de l\'image vers $apiUrl (${bytes.length} octets)');
+
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"image": base64Image}),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => throw TimeoutException("Serveur ne répond pas"),
+      );
+
+      debugPrint('Réponse serveur: ${response.statusCode}');
+      debugPrint('Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        setState(() {
+          if (data["detections"] != null && data["detections"].isNotEmpty) {
+            _resultText = "Objets détectés :\n\n" +
+                data["detections"]
+                    .map<String>((d) =>
+                        "• ${d['label']} (confiance: ${d['confidence']})")
+                    .join("\n");
+          } else {
+            _resultText = "✅ Aucun objet scolaire détecté.";
+          }
+        });
+      } else {
+        setState(() {
+          _resultText =
+              "❌ Erreur serveur : ${response.statusCode}\n${response.body}";
+        });
+      }
+    } catch (e) {
+      debugPrint('Erreur lors de l\'analyse: $e');
+      setState(() {
+        _resultText = "❌ Erreur : $e";
+      });
+    } finally {
+      setState(() {
+        _isAnalyzing = false;
       });
     }
   }
@@ -127,24 +197,24 @@ class _GalleryScreenState extends State<GalleryScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: _selectedImage != null
-                      ? () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              backgroundColor: Color(0xFF6A11CB),
-                              content: Text(
-                                "Analyse en cours...",
-                                style: TextStyle(color: Colors.white),
-                              ),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        }
+                  onPressed: _selectedImage != null && !_isAnalyzing
+                      ? _analyzeImage
                       : null,
-                  icon: const Icon(Icons.search_rounded),
-                  label: const Text(
-                    "Analyser",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  icon: _isAnalyzing
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Icon(Icons.search_rounded),
+                  label: Text(
+                    _isAnalyzing ? "Analyse en cours..." : "Analyser",
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2575FC),
@@ -160,6 +230,34 @@ class _GalleryScreenState extends State<GalleryScreen> {
               ),
 
               const SizedBox(height: 20),
+
+              // 📊 Affichage des résultats
+              if (_resultText.isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 12,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: SingleChildScrollView(
+                    child: Text(
+                      _resultText,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: Colors.black87,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
