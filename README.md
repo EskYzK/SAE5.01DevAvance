@@ -1,6 +1,6 @@
 # SAE5.01DevAvance
 Dépôt du projet de la SAE 5.01 de Développement avancé | Développement d'une application de reconnaissance et de classement d'objets du monde réel en temps réel - Sujet choisi : Matériel scolaire  
-Membres : CHOLLET Thomas/AIT BAHA Said/MORINON Lilian/KERBER Alexandre
+Membres : CHOLLET Thomas / AIT BAHA Said / MORINON Lilian / KERBER Alexandre
 
 # 📘 Fiche Git – Organisation du projet SAE5.01DevAvance
 
@@ -44,13 +44,15 @@ git checkout membreX_branch
 Quand vous avez fait des changements :
 ```bash
 git add .
-git commit -m "Description courte de ce qui a été fait"
+git commit -m ":emoji: Description courte de ce qui a été fait"
 ```
 
 Exemples :
-- "Ajout de la page d'accueil Flutter"
-- "Création du script d'entraînement TensorFlow"
-- "Mise à jour du README"
+- ":sparkles: Ajout de la page d'accueil Flutter"
+- ":sparkles: Création du script d'entraînement TensorFlow"
+- ":memo: Mise à jour du README"
+
+> 💡 Vous pouvez vous rendre sur https://gitmoji.dev afin de trouver un emoji adapté au commit que vous souhaitez faire
 
 ---
 

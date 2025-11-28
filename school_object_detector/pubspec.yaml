@@ -30,12 +30,13 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  camera: ^0.11.2
+  http: ^1.2.2
+  image_picker: ^1.1.1
+  camera: ^0.11.1
+  google_mlkit_object_detection: ^0.15.0
+  image: ^4.0.17
   path_provider: ^2.0.15
   path: ^1.8.3
-  image_picker: ^1.0.7
-
-  google_mlkit_object_detection: ^0.15.0
 
 
   # The following adds the Cupertino Icons font to your application.

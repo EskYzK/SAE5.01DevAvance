@@ -1,0 +1,19 @@
+# Ignorer l'environnement Python
+ml_model/venv/
+
+# Ignorer les fichiers de modèles lourds
+*.h5
+*.tflite
+
+# Ignorer les fichiers temporaires
+__pycache__/
+*.pyc
+.DS_Store
+.vscode/
+
+# Fichiers lourds à ignorer
+*.pt
+*.tflite
+runs/
+dataset/
+__pycache__/
