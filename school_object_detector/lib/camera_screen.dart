@@ -148,7 +148,10 @@ class ObjectPainter extends CustomPainter {
   ObjectPainter(this.objects, this.imageSize, this.widgetSize);
 
   @override
-  void paint(Canvas canvas, Size size) {
+  // Dans lib/camera_screen.dart, trouvez et modifiez la méthode paint de ObjectPainter
+
+@override
+void paint(Canvas canvas, Size size) {
     final Paint paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.0
@@ -159,9 +162,8 @@ class ObjectPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     for (var object in objects) {
-      // Mise à l'échelle des coordonnées (la caméra et l'écran n'ont pas la même taille)
-      // Note: C'est une mise à l'échelle simplifiée.
-      final double scaleX = widgetSize.width / imageSize.height; // Inversion W/H due à la rotation portrait
+      // Mise à l'échelle des coordonnées (inchangé)
+      final double scaleX = widgetSize.width / imageSize.height; 
       final double scaleY = widgetSize.height / imageSize.width;
 
       final Rect scaledRect = Rect.fromLTRB(
@@ -173,29 +175,36 @@ class ObjectPainter extends CustomPainter {
 
       canvas.drawRect(scaledRect, paint);
 
-      String labelText = "Objet Détecté";
+      // --- CORRECTION DU LABEL ---
+      String labelText = "Objet Détecté"; 
 
-      // Afficher le label si disponible
+      // Si le modèle temporaire renvoyait des labels, il les utiliserait ici.
+      // Dans notre cas, il utilisera "Objet Détecté".
       if (object.labels.isNotEmpty) {
         final label = "${object.labels.first.text} ${(object.labels.first.confidence * 100).toStringAsFixed(0)}%";
         labelText = label;
-        
-        const textStyle = TextStyle(color: Colors.white, fontSize: 16);
-        final textSpan = TextSpan(text: labelText, style: textStyle);
-        final textPainter = TextPainter(text: textSpan, textDirection: TextDirection.ltr);
-        textPainter.layout();
+      } 
 
-        // Fond noir pour le texte
-        canvas.drawRect(
-          Rect.fromLTWH(scaledRect.left, scaledRect.top - 20, textPainter.width + 10, 20), 
-          textBgPaint
-        );
-        textPainter.paint(canvas, Offset(scaledRect.left + 5, scaledRect.top - 20));
-      }
+      const textStyle = TextStyle(color: Colors.white, fontSize: 16);
+      final textSpan = TextSpan(text: labelText, style: textStyle);
+      final textPainter = TextPainter(text: textSpan, textDirection: TextDirection.ltr);
+      textPainter.layout();
+
+      // Position Y du texte : on prend le haut du rectangle + 5px pour le forcer à l'intérieur
+      // C'est plus sûr quand la boîte est au bord de l'écran.
+      final double textY = scaledRect.top + 5; 
+      
+      // On dessine le fond noir du texte
+      canvas.drawRect(
+        Rect.fromLTWH(scaledRect.left, textY, textPainter.width + 10, textPainter.height + 5), 
+        textBgPaint
+      );
+      // On dessine le texte par-dessus
+      textPainter.paint(canvas, Offset(scaledRect.left + 5, textY + 2));
     }
-  }
+}
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
-// Nécessaire pour WriteBuffer
+
