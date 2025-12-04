@@ -1,9 +1,12 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
-import 'camera_screen.dart'; // Importe ton nouvel écran
+import 'camera_screen.dart';
+import 'home_screen.dart';
+import 'gallery_screen.dart';
+import 'history_screen.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized(); // Important pour les plugins
+  WidgetsFlutterBinding.ensureInitialized(); 
   runApp(const MyApp());
 }
 
@@ -18,7 +21,15 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const CameraScreen(), // Lance directement la caméra
+      // 1. Définir la page d'accueil comme point de départ
+      initialRoute: '/',
+      // 2. Définir toutes les routes de navigation
+      routes: {
+        '/': (context) => const HomeScreen(),
+        '/camera': (context) => const CameraScreen(),
+        '/gallery': (context) => const GalleryScreen(),
+        '/history': (context) => const HistoryScreen(),
+      },
     );
   }
 }
