@@ -173,12 +173,15 @@ class ObjectPainter extends CustomPainter {
 
       canvas.drawRect(scaledRect, paint);
 
+      String labelText = "Objet Détecté";
+
       // Afficher le label si disponible
       if (object.labels.isNotEmpty) {
         final label = "${object.labels.first.text} ${(object.labels.first.confidence * 100).toStringAsFixed(0)}%";
+        labelText = label;
         
         const textStyle = TextStyle(color: Colors.white, fontSize: 16);
-        final textSpan = TextSpan(text: label, style: textStyle);
+        final textSpan = TextSpan(text: labelText, style: textStyle);
         final textPainter = TextPainter(text: textSpan, textDirection: TextDirection.ltr);
         textPainter.layout();
 

@@ -16,7 +16,7 @@ class ObjectDetectionService {
     final options = LocalObjectDetectorOptions(
       mode: DetectionMode.stream, // Mode optimisé pour la vidéo en temps réel
       modelPath: modelPath,
-      classifyObjects: true,     // Demander les labels (ex: "person", "chair")
+      classifyObjects: false,     // Demander les labels (ex: "person", "chair")
       multipleObjects: true,     // Détecter plusieurs objets à la fois
       confidenceThreshold: 0.5,  // Seuil de confiance (50%)
     );
