@@ -488,9 +488,28 @@ class _DetectionsPainter extends CustomPainter {
 
     final textStyle = const TextStyle(color: Colors.white, fontSize: 12);
 
-    final double pw = size.width;
-    final double ph = size.height;
+    final double pw = size.width; // Largeur du Canvas (écran)
+    final double ph = size.height; // Hauteur du Canvas (écran)
 
+    // Dimensions de l'image brute (souvent inversées si le téléphone est en mode portrait)
+    final double? imageWidth = controller?.value.previewSize?.height;
+    final double? imageHeight = controller?.value.previewSize?.width;
+
+    if (imageWidth == null || imageHeight == null || imageWidth == 0 || imageHeight == 0) {
+      return;
+    }
+
+    // Le facteur d'échelle est inversé car la CameraPreview inverse width et height.
+    // final double scaleX = pw / imageWidth; // Largeur du Canvas / Hauteur de la Preview
+    // final double scaleY = ph / imageHeight; // Hauteur du Canvas / Largeur de la Preview
+    
+    // Le ratio d'aspect est conservé grâce au FittedBox(fit: BoxFit.cover). 
+    // Nous prenons le facteur d'échelle le plus petit pour ne pas déborder (bien que BoxFit.cover s'en charge).
+    // final double scale = scaleX < scaleY ? scaleX : scaleY; 
+
+    // Ajustement de la translation si le mode est BoxFit.cover et l'image ne couvre pas parfaitement
+    // Puisque vous utilisez FittedBox(fit: BoxFit.cover), cela n'est pas nécessaire ici.
+    
     final bool isFront =
         controller?.description.lensDirection == CameraLensDirection.front;
 
@@ -506,7 +525,7 @@ class _DetectionsPainter extends CustomPainter {
         double x2 = (bbox['x2'] ?? 0).toDouble();
         double y2 = (bbox['y2'] ?? 0).toDouble();
 
-        // 🔹 Réduire légèrement les boîtes pour mieux ajuster les objets (15% de réduction)
+        // 🔹 Réduire légèrement les boîtes pour mieux ajuster les objets (votre logique conservée)
         final double boxWidth = x2 - x1;
         final double boxHeight = y2 - y1;
         final double shrinkFactor = 0.15;
@@ -515,6 +534,7 @@ class _DetectionsPainter extends CustomPainter {
         x2 -= boxWidth * shrinkFactor / 2;
         y2 -= boxHeight * shrinkFactor / 2;
 
+        // 1. Inversion sur l'axe X pour la caméra frontale (Mirroring)
         if (isFront) {
           final double nx1 = 1.0 - x2;
           final double nx2 = 1.0 - x1;
@@ -522,12 +542,16 @@ class _DetectionsPainter extends CustomPainter {
           x2 = nx2;
         }
 
-        final double x = x1 * pw;
-        final double y = y1 * ph;
-        final double w = (x2 - x1) * pw;
-        final double h = (y2 - y1) * ph;
-
-        canvas.drawRect(Rect.fromLTWH(x, y, w, h), paint);
+        // 2. Application de la mise à l'échelle et de la rotation :
+        // Les coordonnées normalisées (0-1) sont multipliées par la dimension opposée de l'écran.
+        // C'est la clé de la correction.
+        final double left = y1 * pw; // y1 de l'image * Largeur de l'écran
+        final double top = x1 * ph; // x1 de l'image * Hauteur de l'écran
+        final double width = (y2 - y1) * pw;
+        final double height = (x2 - x1) * ph;
+        
+        // 3. Dessin de la boîte
+        canvas.drawRect(Rect.fromLTWH(left, top, width, height), paint);
 
         final String label = d['label']?.toString() ?? '';
         final String conf = d['confidence']?.toString() ?? '';
@@ -540,7 +564,7 @@ class _DetectionsPainter extends CustomPainter {
           textDirection: TextDirection.ltr,
         )..layout();
 
-        tp.paint(canvas, Offset(x, (y - 16).clamp(0, ph - 10)));
+        tp.paint(canvas, Offset(left, (top - 16).clamp(0, ph - 10)));
       } catch (_) {}
     }
   }
