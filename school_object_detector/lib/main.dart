@@ -21,9 +21,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      // 1. Définir la page d'accueil comme point de départ
       initialRoute: '/',
-      // 2. Définir toutes les routes de navigation
       routes: {
         '/': (context) => const HomeScreen(),
         '/camera': (context) => const CameraScreen(),
