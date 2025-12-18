@@ -1,9 +1,9 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
-import 'camera_screen.dart';
-import 'home_screen.dart';
-import 'gallery_screen.dart';
-import 'history_screen.dart';
+import 'screens/camera_screen.dart';
+import 'screens/home_screen.dart';
+import 'screens/gallery_screen.dart';
+import 'screens/history_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized(); 
@@ -26,7 +26,7 @@ class ObjectDetectorApp extends StatelessWidget {
         '/': (context) => const HomeScreen(),
         '/camera': (context) => const CameraScreen(),
         '/gallery': (context) => const GalleryScreen(),
-        '/history': (context) => const HistoryScreen(),
+        '/history': (context) => const HistoryScreen(images:[]),
       },
     );
   }
