@@ -16,7 +16,6 @@ class _DetectPageState extends State<DetectPage> {
   File? _image;
   String _resultText = "";
 
-  // ⚙️ Ton IP locale (celle de ton Flask)
   final String apiUrl = "http://172.20.10.9:5001/detect";
 
   Future<void> _pickImage() async {

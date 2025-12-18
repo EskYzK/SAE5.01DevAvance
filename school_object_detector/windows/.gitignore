@@ -16,6 +16,6 @@ x86/
 # but keep track of directories ending in .cache
 !*.[Cc]ache/
 
-
 flutter/generated_plugin_registrant.cc
+flutter/generated_plugin_registrant.h
 flutter/generated_plugins.cmake
