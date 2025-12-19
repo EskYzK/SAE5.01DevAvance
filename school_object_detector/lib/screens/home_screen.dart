@@ -17,7 +17,7 @@ class HomeScreen extends StatelessWidget {
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 30),
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -135,12 +135,17 @@ class HomeScreen extends StatelessWidget {
           children: [
             Icon(icon, color: textColor, size: 20),
             const SizedBox(width: 10),
-            Text(
-              label,
-              style: TextStyle(
-                color: textColor,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+            // Modification ici : Ajout de Flexible
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+                // Optionnel : centre le texte s'il passe sur deux lignes
+                textAlign: TextAlign.center, 
               ),
             ),
           ],
