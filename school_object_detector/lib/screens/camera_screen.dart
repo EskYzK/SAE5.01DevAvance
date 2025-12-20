@@ -212,8 +212,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
             CustomPaint(
               painter: ObjectPainter(
                 _detectedObjects, 
-                _imageSize!, 
-                _controller!.value.previewSize!, 
+                _imageSize!,
                 _cameras.isNotEmpty ? _cameras[_selectedCameraIndex].lensDirection : CameraLensDirection.back
               ),
             ),
@@ -252,10 +251,9 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
 class ObjectPainter extends CustomPainter {
   final List<DetectedObject> objects;
   final Size imageSize;
-  final Size widgetSize; 
   final CameraLensDirection lensDirection;
 
-  ObjectPainter(this.objects, this.imageSize, this.widgetSize, this.lensDirection);
+  ObjectPainter(this.objects, this.imageSize, this.lensDirection);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -269,46 +267,64 @@ class ObjectPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     for (var object in objects) {
-      final double scaleX = size.width / imageSize.height; 
+      // 1. Calcul des ratios (Inversion hauteur/largeur pour le mode Portrait)
+      final double scaleX = size.width / imageSize.height;
       final double scaleY = size.height / imageSize.width;
 
-      double left = object.boundingBox.left * scaleX;
-      double top = object.boundingBox.top * scaleY;
-      double right = object.boundingBox.right * scaleX;
-      double bottom = object.boundingBox.bottom * scaleY;
+      double left, top, right, bottom;
 
+      // 2. Gestion propre du mode miroir (Caméra Frontale)
       if (lensDirection == CameraLensDirection.front) {
-        final double centerX = size.width / 2;
-        left = centerX + (centerX - left);
-        right = centerX + (centerX - right);
-        final temp = left; left = right; right = temp;
+        // On inverse l'axe horizontal par rapport à la largeur du widget
+        left = size.width - (object.boundingBox.right * scaleX);
+        right = size.width - (object.boundingBox.left * scaleX);
+      } else {
+        left = object.boundingBox.left * scaleX;
+        right = object.boundingBox.right * scaleX;
       }
 
-      final Rect scaledRect = Rect.fromLTRB(left, top, right, bottom);
+      top = object.boundingBox.top * scaleY;
+      bottom = object.boundingBox.bottom * scaleY;
 
+      final Rect scaledRect = Rect.fromLTRB(left, top, right, bottom);
       canvas.drawRect(scaledRect, paint);
 
-      String labelText = "Objet"; 
+      // 3. Préparation du texte
+      String labelText = "Objet";
       if (object.labels.isNotEmpty) {
         final label = object.labels.first;
         labelText = "${label.text} ${(label.confidence * 100).toStringAsFixed(0)}%";
-      } 
+      }
 
-      const textStyle = TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold);
-      final textSpan = TextSpan(text: labelText, style: textStyle);
+      final textSpan = TextSpan(
+        text: labelText,
+        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+      );
       final textPainter = TextPainter(text: textSpan, textDirection: TextDirection.ltr);
       textPainter.layout();
 
-      final double textY = scaledRect.top - textPainter.height - 6; 
-      
+      // 4. Positionnement intelligent du texte (Évite de sortir de l'écran)
+      // Si l'objet est trop haut, on affiche le texte juste en dessous du trait haut
+      double textY = scaledRect.top - textPainter.height - 6;
+      if (textY < 0) {
+        textY = scaledRect.top + 6; 
+      }
+
+      // 5. Dessin du fond de l'étiquette (RRect pour les bords arrondis)
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-          Rect.fromLTWH(scaledRect.left, textY, textPainter.width + 12, textPainter.height + 4),
-          const Radius.circular(4)
-        ), 
-        textBgPaint
+          Rect.fromLTWH(
+            scaledRect.left, 
+            textY, 
+            textPainter.width + 12, 
+            textPainter.height + 4
+          ),
+          const Radius.circular(4),
+        ),
+        textBgPaint,
       );
-      
+
+      // 6. Dessin du texte
       textPainter.paint(canvas, Offset(scaledRect.left + 6, textY + 2));
     }
   }
