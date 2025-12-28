@@ -13,9 +13,9 @@ class ObjectDetectionService {
     final options = LocalObjectDetectorOptions(
       mode: DetectionMode.stream,
       modelPath: modelPath,
-      classifyObjects: false, 
-      multipleObjects: false, 
-      confidenceThreshold: 0.1,
+      classifyObjects: true, 
+      multipleObjects: true, 
+      confidenceThreshold: 0.5,
     );
 
     _objectDetector = ObjectDetector(options: options);
