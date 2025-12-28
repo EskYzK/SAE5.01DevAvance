@@ -33,8 +33,8 @@ class ObjectDetectionService {
         imageHeight: cameraImage.height,
         imageWidth: cameraImage.width,
         iouThreshold: 0.4, // Fusionne les rectangles qui se chevauchent trop
-        confThreshold: 0.5, // Ne garde que ce qui est sûr à 50% minimum
-        classThreshold: 0.5,
+        confThreshold: 0.2, // Ne garde que ce qui est sûr à 50% minimum
+        classThreshold: 0.2,
       );
       return result;
     } catch (e) {

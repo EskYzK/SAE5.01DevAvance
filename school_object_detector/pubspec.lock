@@ -191,10 +191,10 @@ packages:
     dependency: "direct main"
     description:
       name: flutter_vision
-      sha256: ef1765d992ce39998c25a9d4e2eae7c8e5c4d3fc1f31742a829476fd6758ba6f
+      sha256: "79b5481b89f7f7d8b6cf650aa32a92b516dac2c2a0e126ef4e58a18c2b3ef287"
       url: "https://pub.dev"
     source: hosted
-    version: "1.1.4"
+    version: "2.0.0"
   flutter_web_plugins:
     dependency: transitive
     description: flutter
