@@ -1,48 +1,52 @@
-import 'dart:io';
+import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
-import 'package:google_mlkit_object_detection/google_mlkit_object_detection.dart';
-import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:flutter_vision/flutter_vision.dart';
 
 class ObjectDetectionService {
-  ObjectDetector? _objectDetector;
+  late FlutterVision _vision;
+  bool _isLoaded = false;
 
   Future<void> initialize() async {
-    final modelPath = await _copyAssetToLocal('assets/ml/model.tflite');
+    _vision = FlutterVision();
     
-    final options = LocalObjectDetectorOptions(
-      mode: DetectionMode.stream,
-      modelPath: modelPath,
-      classifyObjects: true, 
-      multipleObjects: true, 
-      confidenceThreshold: 0.5,
+    // Chargement du modèle YOLOv8 et des étiquettes
+    await _vision.loadYoloModel(
+      modelPath: 'assets/ml/model.tflite',
+      labels: 'assets/ml/labels.txt', 
+      modelVersion: "yolov8", // Indispensable pour que la librairie comprenne le format
+      numThreads: 2, 
+      useGpu: true, // Active l'accélération graphique si possible
+      quantization: false, // false car tu as exporté en float32
     );
-
-    _objectDetector = ObjectDetector(options: options);
-    print("Modèle IA chargé avec succès !");
+    
+    _isLoaded = true;
+    print("Modèle YOLOv8 chargé avec succès via flutter_vision !");
   }
 
-  Future<String> _copyAssetToLocal(String assetPath) async {
-    final path = '${(await getApplicationSupportDirectory()).path}/${basename(assetPath)}';
-    final file = File(path);
-    if (!await file.exists()) {
-      final byteData = await rootBundle.load(assetPath);
-      await file.writeAsBytes(byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
-    }
-    return path;
-  }
+  // Traitement optimisé pour le flux vidéo (CameraImage)
+  Future<List<Map<String, dynamic>>> processFrame(CameraImage cameraImage) async {
+    if (!_isLoaded) return [];
 
-  Future<List<DetectedObject>> processImage(InputImage inputImage) async {
-    if (_objectDetector == null) return [];
     try {
-      return await _objectDetector!.processImage(inputImage);
+      final result = await _vision.yoloOnFrame(
+        bytesList: cameraImage.planes.map((plane) => plane.bytes).toList(),
+        imageHeight: cameraImage.height,
+        imageWidth: cameraImage.width,
+        iouThreshold: 0.4, // Fusionne les rectangles qui se chevauchent trop
+        confThreshold: 0.5, // Ne garde que ce qui est sûr à 50% minimum
+        classThreshold: 0.5,
+      );
+      return result;
     } catch (e) {
-      print('Erreur de détection: $e');
+      print('Erreur détection YOLO: $e');
       return [];
     }
   }
 
-  void dispose() {
-    _objectDetector?.close();
+  void dispose() async {
+    // Nettoyage de la mémoire
+    if (_isLoaded) {
+      await _vision.closeYoloModel();
+    }
   }
 }

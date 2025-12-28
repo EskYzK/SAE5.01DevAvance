@@ -1,11 +1,7 @@
 import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
-import 'package:google_mlkit_object_detection/google_mlkit_object_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
-
 import 'object_detection_service.dart';
 
 class CameraScreen extends StatefulWidget {
@@ -20,7 +16,8 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
   late ObjectDetectionService _objectDetectionService;
   
   bool _isBusy = false;
-  List<DetectedObject> _detectedObjects = [];
+  // 1. Changement de type : on stocke des Maps venant de YOLO
+  List<Map<String, dynamic>> _detectedObjects = []; 
   Size? _imageSize;
   
   List<CameraDescription> _cameras = [];
@@ -34,21 +31,14 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
     _initialize();
   }
 
-  // Gestion du cycle de vie (quand on quitte l'app ou tourne l'écran de manière forcée)
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final CameraController? cameraController = _controller;
-
-    if (cameraController == null || !cameraController.value.isInitialized) {
-      return;
-    }
+    if (cameraController == null || !cameraController.value.isInitialized) return;
 
     if (state == AppLifecycleState.inactive) {
-      // CRUCIAL : On retire le contrôleur de l'UI avant de le dispose pour éviter le crash
-      setState(() {
-        _controller = null;
-      });
-      cameraController.dispose();
+      _controller?.dispose();
+      setState(() { _controller = null; });
     } else if (state == AppLifecycleState.resumed) {
       _initCamera();
     }
@@ -66,122 +56,73 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
     _cameras = await availableCameras();
     if (_cameras.isEmpty) return;
 
-    final camera = _cameras[_selectedCameraIndex];
-
     final controller = CameraController(
-      camera,
-      ResolutionPreset.medium,
+      _cameras[_selectedCameraIndex],
+      ResolutionPreset.medium, // 480p ou 720p suffisent largement pour YOLO
       enableAudio: false,
-      imageFormatGroup: Platform.isAndroid 
-          ? ImageFormatGroup.nv21 
-          : ImageFormatGroup.bgra8888,
+      // Format d'image optimisé pour chaque plateforme
+      imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.yuv420 : ImageFormatGroup.bgra8888,
     );
 
     try {
       await controller.initialize();
+      if (!mounted) return;
       
-      // On vérifie si le widget est toujours monté avant d'appliquer le state
-      if (!mounted) {
-        return;
-      }
-      
-      controller.startImageStream((CameraImage image) {
+      controller.startImageStream((image) {
         if (!_isBusy) {
           _isBusy = true;
           _processFrame(image);
         }
       });
 
-      setState(() {
-        _controller = controller;
-      });
+      setState(() { _controller = controller; });
     } catch (e) {
       debugPrint("Erreur init caméra: $e");
     }
   }
 
-  Future<void> _switchCamera() async {
-    if (_cameras.length < 2) return;
+  Future<void> _processFrame(CameraImage image) async {
+    if (_controller == null || !mounted) {
+       _isBusy = false;
+       return;
+    }
 
-    // 1. On capture l'ancien contrôleur pour le fermer proprement
-    final oldController = _controller;
+    // 2. Simplification : On passe l'image brute directement
+    final objects = await _objectDetectionService.processFrame(image);
 
-    // 2. On met immédiatement à null dans le state pour que l'UI affiche l'écran noir
-    // au lieu d'essayer d'afficher une caméra détruite.
-    setState(() {
-      _controller = null; 
-      _isBusy = true; 
-      _selectedCameraIndex = (_selectedCameraIndex + 1) % _cameras.length;
-    });
-
-    // 3. On dispose l'ancien
-    await oldController?.stopImageStream();
-    await oldController?.dispose();
-    
-    // Petite pause pour la stabilité
-    await Future.delayed(const Duration(milliseconds: 200));
-
-    // 4. On relance
-    await _initCamera();
-    
     if (mounted) {
       setState(() {
+        _detectedObjects = objects;
+        // On inverse largeur/hauteur car la caméra mobile est orientée à 90° (Portrait)
+        _imageSize = Size(image.height.toDouble(), image.width.toDouble());
         _isBusy = false;
       });
     }
   }
 
-  Future<void> _processFrame(CameraImage image) async {
-    // Sécurité maximale
-    if (_controller == null || !_controller!.value.isInitialized || !mounted) {
-       _isBusy = false;
-       return;
-    }
+  // La fonction de conversion _convertCameraImage a été supprimée (inutile)
 
-    try {
-      final InputImage inputImage = _convertCameraImage(image);
-      final objects = await _objectDetectionService.processImage(inputImage);
+  Future<void> _switchCamera() async {
+    if (_cameras.length < 2) return;
+    
+    final oldController = _controller;
+    setState(() {
+      _controller = null;
+      _isBusy = true; 
+      _selectedCameraIndex = (_selectedCameraIndex + 1) % _cameras.length;
+    });
 
-      if (mounted) {
-        setState(() {
-          _detectedObjects = objects;
-          _imageSize = Size(image.width.toDouble(), image.height.toDouble());
-          _isBusy = false;
-        });
-      }
-    } catch (e) {
-      debugPrint("Erreur processing: $e");
-      if (mounted) {
-        setState(() => _isBusy = false);
-      }
-    }
-  }
-  
-  InputImage _convertCameraImage(CameraImage image) {
-      final allBytes = WriteBuffer();
-      for (final Plane plane in image.planes) {
-        allBytes.putUint8List(plane.bytes);
-      }
-      final bytes = allBytes.done().buffer.asUint8List();
-
-      final Size imageSize = Size(image.width.toDouble(), image.height.toDouble());
-      final InputImageRotation imageRotation = InputImageRotation.rotation90deg;
-      final InputImageFormat inputImageFormat = InputImageFormatValue.fromRawValue(image.format.raw) ?? InputImageFormat.nv21;
-
-      final inputImageData = InputImageMetadata(
-        size: imageSize,
-        rotation: imageRotation,
-        format: inputImageFormat,
-        bytesPerRow: image.planes[0].bytesPerRow,
-      );
-
-      return InputImage.fromBytes(bytes: bytes, metadata: inputImageData);
+    await oldController?.stopImageStream();
+    await oldController?.dispose();
+    await Future.delayed(const Duration(milliseconds: 200));
+    await _initCamera();
+    
+    if (mounted) setState(() => _isBusy = false);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _controller?.stopImageStream();
     _controller?.dispose();
     _objectDetectionService.dispose();
     super.dispose();
@@ -189,10 +130,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
 
   @override
   Widget build(BuildContext context) {
-    // Si pas de contrôleur valide, on affiche un fond noir
-    if (_controller == null || 
-        !_controller!.value.isInitialized || 
-        _controller!.value.previewSize == null) {
+    if (_controller == null || !_controller!.value.isInitialized) {
       return const Scaffold(
         backgroundColor: Colors.black,
         body: Center(child: CircularProgressIndicator(color: Colors.white)),
@@ -204,40 +142,34 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Center(
-            child: CameraPreview(_controller!),
-          ),
+          CameraPreview(_controller!),
           
           if (_imageSize != null)
             CustomPaint(
               painter: ObjectPainter(
                 _detectedObjects, 
                 _imageSize!,
-                _cameras.isNotEmpty ? _cameras[_selectedCameraIndex].lensDirection : CameraLensDirection.back
+                _cameras[_selectedCameraIndex].lensDirection
               ),
             ),
             
+          // Bouton Retour
           Positioned(
-            top: 50,
-            left: 20,
+            top: 50, left: 20,
             child: ElevatedButton.icon(
               onPressed: () => Navigator.pop(context),
               icon: const Icon(Icons.arrow_back, color: Colors.white),
-              label: const Text("Retour", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6A11CB).withOpacity(0.7),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              ),
+              label: const Text("Retour", style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6A11CB).withOpacity(0.7)),
             ),
           ),
 
+          // Bouton Switch Caméra
           Positioned(
-            top: 50,
-            right: 20,
+            top: 50, right: 20,
             child: FloatingActionButton(
-              heroTag: 'SwitchCamera',
-              backgroundColor: Colors.white.withOpacity(0.9),
+              heroTag: 'SwitchCam',
+              backgroundColor: Colors.white,
               onPressed: _switchCamera,
               child: const Icon(Icons.cameraswitch, color: Color(0xFF6A11CB)),
             ),
@@ -248,8 +180,9 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
   }
 }
 
+// 3. Le Peintre adapté au format YOLOv8
 class ObjectPainter extends CustomPainter {
-  final List<DetectedObject> objects;
+  final List<Map<String, dynamic>> objects;
   final Size imageSize;
   final CameraLensDirection lensDirection;
 
@@ -267,65 +200,59 @@ class ObjectPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     for (var object in objects) {
-      // 1. Calcul des ratios (Inversion hauteur/largeur pour le mode Portrait)
-      final double scaleX = size.width / imageSize.height;
-      final double scaleY = size.height / imageSize.width;
+      // YOLO renvoie : {'box': [x1, y1, x2, y2, prob], 'tag': 'label'}
+      final box = object["box"]; 
+      
+      // Extraction des coordonnées brutes
+      final double x1 = box[0];
+      final double y1 = box[1];
+      final double x2 = box[2];
+      final double y2 = box[3];
+      
+      // Calcul du ratio d'échelle pour l'écran
+      final double scaleX = size.width / imageSize.width;
+      final double scaleY = size.height / imageSize.height;
 
-      double left, top, right, bottom;
+      double left = x1 * scaleX;
+      double top = y1 * scaleY;
+      double right = x2 * scaleX;
+      double bottom = y2 * scaleY;
 
-      // 2. Gestion propre du mode miroir (Caméra Frontale)
+      // Gestion du mode miroir pour la caméra selfie
       if (lensDirection == CameraLensDirection.front) {
-        // On inverse l'axe horizontal par rapport à la largeur du widget
-        left = size.width - (object.boundingBox.right * scaleX);
-        right = size.width - (object.boundingBox.left * scaleX);
-      } else {
-        left = object.boundingBox.left * scaleX;
-        right = object.boundingBox.right * scaleX;
+        double temp = left;
+        left = size.width - right;
+        right = size.width - temp;
       }
 
-      top = object.boundingBox.top * scaleY;
-      bottom = object.boundingBox.bottom * scaleY;
+      // Dessin du cadre
+      final Rect rect = Rect.fromLTRB(left, top, right, bottom);
+      canvas.drawRect(rect, paint);
 
-      final Rect scaledRect = Rect.fromLTRB(left, top, right, bottom);
-      canvas.drawRect(scaledRect, paint);
-
-      // 3. Préparation du texte
-      String labelText = "Objet";
-      if (object.labels.isNotEmpty) {
-        final label = object.labels.first;
-        labelText = "${label.text} ${(label.confidence * 100).toStringAsFixed(0)}%";
-      }
-
+      // Préparation de l'étiquette (Nom + Confiance)
+      final String label = "${object['tag']} ${(box[4] * 100).toStringAsFixed(0)}%";
+      
       final textSpan = TextSpan(
-        text: labelText,
+        text: label,
         style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
       );
       final textPainter = TextPainter(text: textSpan, textDirection: TextDirection.ltr);
       textPainter.layout();
 
-      // 4. Positionnement intelligent du texte (Évite de sortir de l'écran)
-      // Si l'objet est trop haut, on affiche le texte juste en dessous du trait haut
-      double textY = scaledRect.top - textPainter.height - 6;
-      if (textY < 0) {
-        textY = scaledRect.top + 6; 
-      }
+      // Dessin du fond de l'étiquette
+      double textY = top - 24;
+      if (textY < 0) textY = top + 4;
 
-      // 5. Dessin du fond de l'étiquette (RRect pour les bords arrondis)
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-          Rect.fromLTWH(
-            scaledRect.left, 
-            textY, 
-            textPainter.width + 12, 
-            textPainter.height + 4
-          ),
+          Rect.fromLTWH(left, textY, textPainter.width + 12, 24),
           const Radius.circular(4),
         ),
         textBgPaint,
       );
 
-      // 6. Dessin du texte
-      textPainter.paint(canvas, Offset(scaledRect.left + 6, textY + 2));
+      // Dessin du texte
+      textPainter.paint(canvas, Offset(left + 6, textY + 4));
     }
   }
 
