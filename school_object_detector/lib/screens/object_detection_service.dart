@@ -1,5 +1,4 @@
 import 'package:camera/camera.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_vision/flutter_vision.dart';
 
 class ObjectDetectionService {
@@ -33,8 +32,8 @@ class ObjectDetectionService {
         imageHeight: cameraImage.height,
         imageWidth: cameraImage.width,
         iouThreshold: 0.4, // Fusionne les rectangles qui se chevauchent trop
-        confThreshold: 0.2, // Ne garde que ce qui est sûr à 50% minimum
-        classThreshold: 0.2,
+        confThreshold: 0.5, // Ne garde que ce qui est sûr à 50% minimum
+        classThreshold: 0.5,
       );
       return result;
     } catch (e) {
