@@ -1,5 +1,6 @@
 import 'package:camera/camera.dart';
 import 'package:flutter_vision/flutter_vision.dart';
+import 'dart:typed_data';
 
 class ObjectDetectionService {
   late FlutterVision _vision;
@@ -38,6 +39,26 @@ class ObjectDetectionService {
       return result;
     } catch (e) {
       print('Erreur détection YOLO: $e');
+      return [];
+    }
+  }
+
+  // Traitement d'une image statique (depuis la galerie ou photo prise)
+  Future<List<Map<String, dynamic>>> processImage(Uint8List imageBytes) async {
+    if (!_isLoaded) return [];
+
+    try {
+      final result = await _vision.yoloOnImage(
+        bytesList: imageBytes,
+        imageHeight: 1280, // YOLO redimensionnera, mais il faut des valeurs par défaut
+        imageWidth: 720,
+        iouThreshold: 0.4,
+        confThreshold: 0.2,
+        classThreshold: 0.2,
+      );
+      return result;
+    } catch (e) {
+      print('Erreur détection image fixe: $e');
       return [];
     }
   }
