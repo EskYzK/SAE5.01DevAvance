@@ -4,6 +4,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+import 'dart:typed_data';
+import 'object_detection_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:ui' as ui;
 
 class GalleryScreen extends StatefulWidget {
   const GalleryScreen({super.key});
@@ -16,21 +20,35 @@ class _GalleryScreenState extends State<GalleryScreen> {
   File? _selectedImage;
   String _resultText = "";
   bool _isAnalyzing = false;
+  late ObjectDetectionService _objectDetectionService;
+  List<Map<String, dynamic>> _detections = [];
+  ui.Image? _loadedImage;
 
-  // 🔗 URL du serveur Flask
-  final String apiUrl = "http://172.20.10.9:5001/detect";
+  @override
+  void initState() {
+    super.initState();
+    _objectDetectionService = ObjectDetectionService();
+    _objectDetectionService.initialize();
+  }
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 85,
     );
 
     if (picked != null) {
       setState(() {
         _selectedImage = File(picked.path);
         _resultText = "";
+        _detections = [];
+        _loadedImage = null;
+      });
+      
+      final data = await _selectedImage!.readAsBytes();
+      final image = await decodeImageFromList(data);
+      setState(() {
+        _loadedImage = image;
       });
     }
   }
@@ -45,42 +63,24 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
     try {
       final bytes = await _selectedImage!.readAsBytes();
-      final base64Image = base64Encode(bytes);
+      final detections = await _objectDetectionService.processImage(bytes);
 
-      debugPrint('Envoi de l\'image vers $apiUrl (${bytes.length} octets)');
+      await _addToHistory(_selectedImage!.path);
 
-      final response = await http.post(
-        Uri.parse(apiUrl),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"image": base64Image}),
-      ).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () => throw TimeoutException("Serveur ne répond pas"),
-      );
+      setState(() {
+        _detections = detections;
+        
+        if (detections.isNotEmpty) {
+          _resultText = "Objets détectés :\n\n" +
+              detections.map<String>((d) {
+                 double conf = (d['box'][4] * 100); 
+                 return "• ${d['tag']} (confiance: ${conf.toStringAsFixed(0)}%)";
+              }).join("\n");
+        } else {
+          _resultText = "✅ Aucun objet scolaire détecté.";
+        }
+      });
 
-      debugPrint('Réponse serveur: ${response.statusCode}');
-      debugPrint('Body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
-        setState(() {
-          if (data["detections"] != null && data["detections"].isNotEmpty) {
-            _resultText = "Objets détectés :\n\n" +
-                data["detections"]
-                    .map<String>((d) =>
-                        "• ${d['label']} (confiance: ${d['confidence']})")
-                    .join("\n");
-          } else {
-            _resultText = "✅ Aucun objet scolaire détecté.";
-          }
-        });
-      } else {
-        setState(() {
-          _resultText =
-              "❌ Erreur serveur : ${response.statusCode}\n${response.body}";
-        });
-      }
     } catch (e) {
       debugPrint('Erreur lors de l\'analyse: $e');
       setState(() {
@@ -93,6 +93,14 @@ class _GalleryScreenState extends State<GalleryScreen> {
     }
   }
 
+  Future<void> _addToHistory(String path) async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String> history = prefs.getStringList('history_images') ?? [];
+    history.remove(path);
+    history.add(path);
+    await prefs.setStringList('history_images', history);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -101,7 +109,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
         title: const Text("Analyse d'image"),
         centerTitle: true,
         elevation: 0,
-        //  Remplace la couleur unie par le même gradient que la Home
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -153,24 +160,48 @@ class _GalleryScreenState extends State<GalleryScreen> {
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.08),
+                                color: Colors.black.withOpacity(0.08),
                                 blurRadius: 12,
                                 offset: const Offset(0, 6),
                               ),
                             ],
                           ),
                           clipBehavior: Clip.hardEdge,
-                          child: Image.file(
-                            _selectedImage!,
-                            fit: BoxFit.contain,
-                            width: double.infinity,
-                          ),
+                          // Modification ici : Stack pour superposer les cadres sur l'image
+                          child: _loadedImage == null 
+                            ? Image.file(_selectedImage!, fit: BoxFit.contain)
+                            : LayoutBuilder(
+                                builder: (context, constraints) {
+                                  return FittedBox(
+                                    fit: BoxFit.contain,
+                                    child: SizedBox(
+                                      width: _loadedImage!.width.toDouble(),
+                                      height: _loadedImage!.height.toDouble(),
+                                      child: Stack(
+                                        children: [
+                                          Image.file(_selectedImage!),
+                                          CustomPaint(
+                                            painter: GalleryObjectPainter(
+                                              _detections,
+                                            ),
+                                            size: Size(
+                                              _loadedImage!.width.toDouble(),
+                                              _loadedImage!.height.toDouble(),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
                         ),
                 ),
               ),
 
               const SizedBox(height: 30),
 
+              // BOUTON CHOISIR (Ton style exact)
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -194,6 +225,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
               const SizedBox(height: 15),
 
+              // BOUTON ANALYSER (Ton style exact)
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -231,7 +263,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
               const SizedBox(height: 20),
 
-              // 📊 Affichage des résultats
+              // RESULTATS (Ton style exact)
               if (_resultText.isNotEmpty)
                 Container(
                   width: double.infinity,
@@ -241,7 +273,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.08),
+                        color: Colors.black.withOpacity(0.08),
                         blurRadius: 12,
                         offset: const Offset(0, 6),
                       ),
@@ -264,4 +296,28 @@ class _GalleryScreenState extends State<GalleryScreen> {
       ),
     );
   }
+}
+
+class GalleryObjectPainter extends CustomPainter {
+  final List<Map<String, dynamic>> objects;
+
+  GalleryObjectPainter(this.objects);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4.0
+      ..color = const Color(0xFF6A11CB);
+
+    for (var object in objects) {
+      final box = object["box"]; // [x1, y1, x2, y2, prob]
+      // Conversion directe des coordonnées
+      final rect = Rect.fromLTRB(box[0], box[1], box[2], box[3]);
+      canvas.drawRect(rect, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
