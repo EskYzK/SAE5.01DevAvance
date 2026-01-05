@@ -58,7 +58,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
 
     final controller = CameraController(
       _cameras[_selectedCameraIndex],
-      ResolutionPreset.high, // 480p ou 720p suffisent largement pour YOLO
+      ResolutionPreset.high,
       enableAudio: false,
       // Format d'image optimisé pour chaque plateforme
       imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.yuv420 : ImageFormatGroup.bgra8888,
