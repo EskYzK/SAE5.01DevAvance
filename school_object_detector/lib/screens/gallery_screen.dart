@@ -1,9 +1,13 @@
 import 'dart:io';
-import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
+import 'dart:typed_data';
+import 'object_detection_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image/image.dart' as img; 
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 
 class GalleryScreen extends StatefulWidget {
   const GalleryScreen({super.key});
@@ -14,83 +18,140 @@ class GalleryScreen extends StatefulWidget {
 
 class _GalleryScreenState extends State<GalleryScreen> {
   File? _selectedImage;
+  // On ajoute une variable pour stocker l'image corrigée (droite)
+  Uint8List? _correctedImageBytes; 
+  Size? _correctedImageSize;
+
   String _resultText = "";
   bool _isAnalyzing = false;
+  late ObjectDetectionService _objectDetectionService;
+  List<Map<String, dynamic>> _detections = [];
 
-  // 🔗 URL du serveur Flask
-  final String apiUrl = "http://172.20.10.9:5001/detect";
+  @override
+  void initState() {
+    super.initState();
+    _objectDetectionService = ObjectDetectionService();
+    _objectDetectionService.initialize();
+  }
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-    );
+    final picked = await picker.pickImage(source: ImageSource.gallery);
 
     if (picked != null) {
       setState(() {
         _selectedImage = File(picked.path);
+        _correctedImageBytes = null; // Reset
+        _correctedImageSize = null;
         _resultText = "";
+        _detections = [];
       });
     }
   }
 
   Future<void> _analyzeImage() async {
-    if (_selectedImage == null) return;
+  if (_selectedImage == null) return;
 
-    setState(() {
-      _isAnalyzing = true;
-      _resultText = "Analyse en cours...";
-    });
+  setState(() {
+    _isAnalyzing = true;
+    _resultText = "Analyse en cours...";
+  });
 
-    try {
-      final bytes = await _selectedImage!.readAsBytes();
-      final base64Image = base64Encode(bytes);
+  try {
+    final rawBytes = await _selectedImage!.readAsBytes();
 
-      debugPrint('Envoi de l\'image vers $apiUrl (${bytes.length} octets)');
+    // 1. On décode et on corrige l'orientation
+    img.Image? originalImage = img.decodeImage(rawBytes);
+    
+    if (originalImage != null) {
+      // "Cuisson" de l'orientation (remet l'image droite pour de bon)
+      img.Image fixedImage = img.bakeOrientation(originalImage);
 
-      final response = await http.post(
-        Uri.parse(apiUrl),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"image": base64Image}),
-      ).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () => throw TimeoutException("Serveur ne répond pas"),
+      // 2. Analyse par l'IA
+      // On encode en JPG pour l'envoyer à l'IA
+      final fixedBytes = img.encodeJpg(fixedImage);
+      final detections = await _objectDetectionService.processImage(
+        fixedBytes, 
+        fixedImage.width, 
+        fixedImage.height
       );
 
-      debugPrint('Réponse serveur: ${response.statusCode}');
-      debugPrint('Body: ${response.body}');
+      // 3. DESSIN DES RECTANGLES SUR L'IMAGE (La partie magique)
+      // On dessine directement sur 'fixedImage' qui sera sauvegardée
+      for (var detection in detections) {
+        final box = detection["box"]; // [x1, y1, x2, y2, prob]
+        
+        // Conversion en entiers pour la librairie 'image'
+        final x1 = (box[0] as double).toInt();
+        final y1 = (box[1] as double).toInt();
+        final x2 = (box[2] as double).toInt();
+        final y2 = (box[3] as double).toInt();
+        
+        // Dessin du rectangle (Rouge, épaisseur 4)
+        img.drawRect(
+          fixedImage, 
+          x1: x1, y1: y1, x2: x2, y2: y2, 
+          color: img.ColorRgb8(255, 0, 0), 
+          thickness: 4
+        );
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
-        setState(() {
-          if (data["detections"] != null && data["detections"].isNotEmpty) {
-            _resultText = "Objets détectés :\n\n" +
-                data["detections"]
-                    .map<String>((d) =>
-                        "• ${d['label']} (confiance: ${d['confidence']})")
-                    .join("\n");
-          } else {
-            _resultText = "✅ Aucun objet scolaire détecté.";
-          }
-        });
-      } else {
-        setState(() {
-          _resultText =
-              "❌ Erreur serveur : ${response.statusCode}\n${response.body}";
-        });
+        // Dessin du texte (Si possible)
+        // Note: img.arial24 est une police incluse par défaut
+        final label = "${detection['tag']} ${(box[4] * 100).toStringAsFixed(0)}%";
+        img.drawString(
+          fixedImage, 
+          label, 
+          font: img.arial24, 
+          x: x1 + 5, 
+          y: y1 + 5, 
+          color: img.ColorRgb8(255, 0, 0)
+        );
       }
-    } catch (e) {
-      debugPrint('Erreur lors de l\'analyse: $e');
+
+      // 4. Sauvegarde de l'image annotée dans le téléphone
+      final directory = await getApplicationDocumentsDirectory();
+      final fileName = 'analyse_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final savedPath = p.join(directory.path, fileName);
+      
+      // On écrit le fichier modifié sur le disque
+      final finalBytes = img.encodeJpg(fixedImage);
+      await File(savedPath).writeAsBytes(finalBytes);
+
+      // 5. On ajoute le chemin de l'image MODIFIÉE à l'historique
+      await _addToHistory(savedPath);
+
       setState(() {
-        _resultText = "❌ Erreur : $e";
-      });
-    } finally {
-      setState(() {
-        _isAnalyzing = false;
+        _detections = detections;
+        // On affiche l'image modifiée à l'écran aussi
+        _correctedImageBytes = finalBytes; 
+        _correctedImageSize = Size(fixedImage.width.toDouble(), fixedImage.height.toDouble());
+        
+        if (detections.isNotEmpty) {
+           _resultText = "Objets détectés et image sauvegardée !";
+        } else {
+          _resultText = "✅ Aucun objet scolaire détecté.";
+        }
       });
     }
+
+  } catch (e) {
+    debugPrint('Erreur lors de l\'analyse: $e');
+    setState(() {
+      _resultText = "❌ Erreur : $e";
+    });
+  } finally {
+    setState(() {
+      _isAnalyzing = false;
+    });
+  }
+}
+
+  Future<void> _addToHistory(String path) async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String> history = prefs.getStringList('history_images') ?? [];
+    history.remove(path);
+    history.add(path);
+    await prefs.setStringList('history_images', history);
   }
 
   @override
@@ -101,7 +162,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
         title: const Text("Analyse d'image"),
         centerTitle: true,
         elevation: 0,
-        //  Remplace la couleur unie par le même gradient que la Home
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -113,9 +173,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
         ),
         foregroundColor: Colors.white,
         titleTextStyle: const TextStyle(
-          color: Colors.white,
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
+          color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600,
         ),
       ),
 
@@ -126,25 +184,16 @@ class _GalleryScreenState extends State<GalleryScreen> {
             children: [
               const SizedBox(height: 20),
 
+              // ZONE D'IMAGE
               Expanded(
                 child: Center(
                   child: _selectedImage == null
                       ? Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              Icons.photo_library_rounded,
-                              size: 90,
-                              color: Colors.grey[400],
-                            ),
+                            Icon(Icons.photo_library_rounded, size: 90, color: Colors.grey[400]),
                             const SizedBox(height: 20),
-                            const Text(
-                              "Aucune image sélectionnée",
-                              style: TextStyle(
-                                fontSize: 17,
-                                color: Colors.black54,
-                              ),
-                            ),
+                            const Text("Aucune image sélectionnée", style: TextStyle(fontSize: 17, color: Colors.black54)),
                           ],
                         )
                       : Container(
@@ -152,18 +201,36 @@ class _GalleryScreenState extends State<GalleryScreen> {
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.08),
-                                blurRadius: 12,
-                                offset: const Offset(0, 6),
-                              ),
+                              BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 6)),
                             ],
                           ),
                           clipBehavior: Clip.hardEdge,
-                          child: Image.file(
-                            _selectedImage!,
-                            fit: BoxFit.contain,
-                            width: double.infinity,
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              // 3. LOGIQUE D'AFFICHAGE INTELLIGENTE
+                              // Si on a fait l'analyse, on affiche l'image corrigée (bytes).
+                              // Sinon, on affiche le fichier brut (File).
+                              final bool hasAnalysis = _correctedImageBytes != null && _correctedImageSize != null;
+                              
+                              return FittedBox(
+                                fit: BoxFit.contain,
+                                child: hasAnalysis 
+                                  ? SizedBox(
+                                      width: _correctedImageSize!.width,
+                                      height: _correctedImageSize!.height,
+                                      child: Stack(
+                                        children: [
+                                          Image.memory(_correctedImageBytes!), // L'image EXACTE vue par YOLO
+                                          CustomPaint(
+                                            painter: GalleryObjectPainter(_detections),
+                                            size: _correctedImageSize!,
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  : Image.file(_selectedImage!), // Affichage simple avant analyse
+                              );
+                            },
                           ),
                         ),
                 ),
@@ -171,22 +238,18 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
               const SizedBox(height: 30),
 
+              // BOUTONS
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: _pickImage,
                   icon: const Icon(Icons.add_photo_alternate_outlined),
-                  label: const Text(
-                    "Choisir une image",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
+                  label: const Text("Choisir une image", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF6A11CB),
                     foregroundColor: Colors.white,
                     minimumSize: const Size(double.infinity, 55),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     elevation: 3,
                   ),
                 ),
@@ -197,33 +260,17 @@ class _GalleryScreenState extends State<GalleryScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: _selectedImage != null && !_isAnalyzing
-                      ? _analyzeImage
-                      : null,
+                  onPressed: _selectedImage != null && !_isAnalyzing ? _analyzeImage : null,
                   icon: _isAnalyzing
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)))
                       : const Icon(Icons.search_rounded),
-                  label: Text(
-                    _isAnalyzing ? "Analyse en cours..." : "Analyser",
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
+                  label: Text(_isAnalyzing ? "Analyse en cours..." : "Analyser", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2575FC),
                     foregroundColor: Colors.white,
                     disabledBackgroundColor: Colors.grey[400],
                     minimumSize: const Size(double.infinity, 55),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     elevation: 3,
                   ),
                 ),
@@ -231,7 +278,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
               const SizedBox(height: 20),
 
-              // 📊 Affichage des résultats
               if (_resultText.isNotEmpty)
                 Container(
                   width: double.infinity,
@@ -239,23 +285,10 @@ class _GalleryScreenState extends State<GalleryScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.08),
-                        blurRadius: 12,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 6))],
                   ),
                   child: SingleChildScrollView(
-                    child: Text(
-                      _resultText,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        color: Colors.black87,
-                        height: 1.5,
-                      ),
-                    ),
+                    child: Text(_resultText, style: const TextStyle(fontSize: 15, color: Colors.black87, height: 1.5)),
                   ),
                 ),
             ],
@@ -264,4 +297,61 @@ class _GalleryScreenState extends State<GalleryScreen> {
       ),
     );
   }
+}
+
+class GalleryObjectPainter extends CustomPainter {
+  final List<Map<String, dynamic>> objects;
+
+  GalleryObjectPainter(this.objects);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0
+      ..color = Colors.red; // Cadre rouge comme la caméra
+
+    final Paint textBgPaint = Paint()
+      ..color = Colors.black54
+      ..style = PaintingStyle.fill;
+
+    for (var object in objects) {
+      final box = object["box"]; // [x1, y1, x2, y2, prob]
+      
+      // Ici, plus de calculs savants : les coordonnées correspondent
+      // EXACTEMENT aux pixels de l'image affichée.
+      final double x1 = box[0];
+      final double y1 = box[1];
+      final double x2 = box[2];
+      final double y2 = box[3];
+      
+      final Rect rect = Rect.fromLTRB(x1, y1, x2, y2);
+      canvas.drawRect(rect, paint);
+
+      // Etiquette
+      final String label = "${object['tag']} ${(box[4] * 100).toStringAsFixed(0)}%";
+      final textSpan = TextSpan(
+        text: label,
+        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+      );
+      final textPainter = TextPainter(text: textSpan, textDirection: TextDirection.ltr);
+      textPainter.layout();
+
+      double textY = y1 - 24;
+      if (textY < 0) textY = y1 + 4;
+
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(x1, textY, textPainter.width + 12, 24),
+          const Radius.circular(4),
+        ),
+        textBgPaint,
+      );
+
+      textPainter.paint(canvas, Offset(x1 + 6, textY + 4));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

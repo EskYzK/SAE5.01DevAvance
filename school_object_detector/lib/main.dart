@@ -27,7 +27,7 @@ class ObjectDetectorApp extends StatelessWidget {
         '/': (context) => const HomeScreen(),
         '/camera': (context) => const CameraScreen(),
         '/gallery': (context) => const GalleryScreen(),
-        '/history': (context) => const HistoryScreen(images:[]),
+        '/history': (context) => const HistoryScreen(),
       },
     );
   }
