@@ -3,6 +3,10 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'object_detection_service.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image/image.dart' as img;
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -16,7 +20,6 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
   late ObjectDetectionService _objectDetectionService;
   
   bool _isBusy = false;
-  // 1. Changement de type : on stocke des Maps venant de YOLO
   List<Map<String, dynamic>> _detectedObjects = []; 
   Size? _imageSize;
   
@@ -60,7 +63,6 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
       _cameras[_selectedCameraIndex],
       ResolutionPreset.high,
       enableAudio: false,
-      // Format d'image optimisé pour chaque plateforme
       imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.yuv420 : ImageFormatGroup.bgra8888,
     );
 
@@ -87,20 +89,16 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
        return;
     }
 
-    // 2. Simplification : On passe l'image brute directement
     final objects = await _objectDetectionService.processFrame(image);
 
     if (mounted) {
       setState(() {
         _detectedObjects = objects;
-        // On inverse largeur/hauteur car la caméra mobile est orientée à 90° (Portrait)
         _imageSize = Size(image.height.toDouble(), image.width.toDouble());
         _isBusy = false;
       });
     }
   }
-
-  // La fonction de conversion _convertCameraImage a été supprimée (inutile)
 
   Future<void> _switchCamera() async {
     if (_cameras.length < 2) return;
@@ -118,6 +116,94 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
     await _initCamera();
     
     if (mounted) setState(() => _isBusy = false);
+  }
+
+  Future<void> _takePictureAndAnalyze() async {
+    if (_controller == null || !_controller!.value.isInitialized || _isBusy) return;
+
+    setState(() => _isBusy = true);
+
+    try {
+      await _controller!.stopImageStream();
+      
+      final XFile photo = await _controller!.takePicture();
+      final File photoFile = File(photo.path);
+      final rawBytes = await photoFile.readAsBytes();
+
+      img.Image? originalImage = img.decodeImage(rawBytes);
+      if (originalImage != null) {
+        img.Image fixedImage = img.bakeOrientation(originalImage);
+        final fixedBytes = img.encodeJpg(fixedImage);
+
+        final detections = await _objectDetectionService.processImage(
+          fixedBytes, 
+          fixedImage.width, 
+          fixedImage.height
+        );
+
+        if (detections.isNotEmpty) {
+          for (var detection in detections) {
+            final box = detection["box"];
+            final x1 = (box[0] as double).toInt();
+            final y1 = (box[1] as double).toInt();
+            final x2 = (box[2] as double).toInt();
+            final y2 = (box[3] as double).toInt();
+
+            img.drawRect(
+              fixedImage, 
+              x1: x1, y1: y1, x2: x2, y2: y2, 
+              color: img.ColorRgb8(255, 0, 0), 
+              thickness: 4
+            );
+
+            final label = "${detection['tag']} ${(box[4] * 100).toStringAsFixed(0)}%";
+            img.drawString(
+              fixedImage, 
+              label, 
+              font: img.arial24, 
+              x: x1 + 5, y: y1 + 5, 
+              color: img.ColorRgb8(255, 0, 0)
+            );
+          }
+
+          final directory = await getApplicationDocumentsDirectory();
+          final fileName = 'capture_${DateTime.now().millisecondsSinceEpoch}.jpg';
+          final savedPath = p.join(directory.path, fileName);
+          
+          await File(savedPath).writeAsBytes(img.encodeJpg(fixedImage));
+          
+          final prefs = await SharedPreferences.getInstance();
+          List<String> history = prefs.getStringList('history_images') ?? [];
+          history.add(savedPath);
+          await prefs.setStringList('history_images', history);
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text("📸 Photo sauvegardée avec ${detections.length} objet(s) !")),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Aucun objet détecté, photo non sauvegardée.")),
+            );
+          }
+        }
+      }
+
+    } catch (e) {
+      debugPrint("Erreur photo: $e");
+    } finally {
+      if (mounted) {
+        setState(() => _isBusy = false);
+        await _controller!.startImageStream((image) {
+          if (!_isBusy) {
+            _isBusy = true;
+            _processFrame(image);
+          }
+        });
+      }
+    }
   }
 
   @override
@@ -142,8 +228,10 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
       body: Stack(
         fit: StackFit.expand,
         children: [
+          // 1. La Vue Caméra
           CameraPreview(_controller!),
           
+          // 2. Les rectangles (si détection temps réel)
           if (_imageSize != null)
             CustomPaint(
               painter: ObjectPainter(
@@ -153,25 +241,53 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
               ),
             ),
             
-          // Bouton Retour
+          // 3. Bouton Retour (Rétabli comme à l'origine)
           Positioned(
             top: 50, left: 20,
             child: ElevatedButton.icon(
               onPressed: () => Navigator.pop(context),
               icon: const Icon(Icons.arrow_back, color: Colors.white),
               label: const Text("Retour", style: TextStyle(color: Colors.white)),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6A11CB).withOpacity(0.7)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6A11CB).withOpacity(0.7),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              ),
             ),
           ),
 
-          // Bouton Switch Caméra
+          // 4. Bouton Switch Caméra (Rétabli comme à l'origine)
           Positioned(
             top: 50, right: 20,
             child: FloatingActionButton(
               heroTag: 'SwitchCam',
+              mini: true, // Un peu plus petit pour laisser la vedette au déclencheur
               backgroundColor: Colors.white,
               onPressed: _switchCamera,
               child: const Icon(Icons.cameraswitch, color: Color(0xFF6A11CB)),
+            ),
+          ),
+
+          // 5. NOUVEAU : Bouton Photo (Style cohérent "Material Design")
+          Positioned(
+            bottom: 100,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: SizedBox(
+                width: 80, // Plus grand que la normale
+                height: 80,
+                child: FloatingActionButton(
+                  heroTag: 'TakePhoto',
+                  backgroundColor: const Color(0xFF6A11CB), // Violet de l'appli
+                  foregroundColor: Colors.white, // Icône blanche
+                  elevation: 8,
+                  onPressed: _takePictureAndAnalyze,
+                  shape: const CircleBorder(), // Bien rond
+                  child: _isBusy 
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Icon(Icons.camera_alt, size: 36),
+                ),
+              ),
             ),
           ),
         ],
@@ -180,7 +296,6 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
   }
 }
 
-// 3. Le Peintre adapté au format YOLOv8
 class ObjectPainter extends CustomPainter {
   final List<Map<String, dynamic>> objects;
   final Size imageSize;
@@ -200,16 +315,13 @@ class ObjectPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     for (var object in objects) {
-      // YOLO renvoie : {'box': [x1, y1, x2, y2, prob], 'tag': 'label'}
       final box = object["box"]; 
       
-      // Extraction des coordonnées brutes
       final double x1 = box[0];
       final double y1 = box[1];
       final double x2 = box[2];
       final double y2 = box[3];
       
-      // Calcul du ratio d'échelle pour l'écran
       final double scaleX = size.width / imageSize.width;
       final double scaleY = size.height / imageSize.height;
 
@@ -218,18 +330,15 @@ class ObjectPainter extends CustomPainter {
       double right = x2 * scaleX;
       double bottom = y2 * scaleY;
 
-      // Gestion du mode miroir pour la caméra selfie
       if (lensDirection == CameraLensDirection.front) {
         double temp = left;
         left = size.width - right;
         right = size.width - temp;
       }
 
-      // Dessin du cadre
       final Rect rect = Rect.fromLTRB(left, top, right, bottom);
       canvas.drawRect(rect, paint);
 
-      // Préparation de l'étiquette (Nom + Confiance)
       final String label = "${object['tag']} ${(box[4] * 100).toStringAsFixed(0)}%";
       
       final textSpan = TextSpan(
@@ -239,7 +348,6 @@ class ObjectPainter extends CustomPainter {
       final textPainter = TextPainter(text: textSpan, textDirection: TextDirection.ltr);
       textPainter.layout();
 
-      // Dessin du fond de l'étiquette
       double textY = top - 24;
       if (textY < 0) textY = top + 4;
 
@@ -251,7 +359,6 @@ class ObjectPainter extends CustomPainter {
         textBgPaint,
       );
 
-      // Dessin du texte
       textPainter.paint(canvas, Offset(left + 6, textY + 4));
     }
   }
