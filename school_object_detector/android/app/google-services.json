@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "798409895748",
+    "project_id": "schoolobjectdetector",
+    "storage_bucket": "schoolobjectdetector.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:798409895748:android:76ca495ceed6fa44bdb111",
+        "android_client_info": {
+          "package_name": "com.example.school_object_detector"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAevfA5nvZGbZkBSp8Oh-W__22Z3s-VQGI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image/image.dart' as img;
+import '../service/sharing_service.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -186,9 +187,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
           await prefs.setStringList('history_images', history);
 
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text("📸 Photo sauvegardée avec ${detections.length} objet(s) !")),
-            );
+            _askToShare(File(savedPath), detections);
           }
         } else {
           if (mounted) {
@@ -212,6 +211,65 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
         });
       }
     }
+  }
+
+  Future<void> _askToShare(File imageFile, List<Map<String, dynamic>> detections) async {
+    if (!mounted) return;
+
+    String label = "Objet inconnu";
+    double confidence = 0.0;
+    
+    if (detections.isNotEmpty) {
+      label = detections[0]['tag'];
+      confidence = detections[0]['box'][4];
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Partager ?"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.file(imageFile, height: 150),
+            const SizedBox(height: 10),
+            Text("Voulez-vous partager cette détection de '$label' avec la communauté ?"),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Non, garder privé"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx); // Ferme la boîte de dialogue
+              
+              // Affiche un chargement
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Envoi en cours...")),
+              );
+
+              try {
+                await SharingService().shareDetection(
+                  imageFile: imageFile,
+                  label: label,
+                  confidence: confidence,
+                );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("✅ Partagé avec succès !")),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Erreur : $e")),
+                );
+              }
+            },
+            child: const Text("Oui, partager"),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

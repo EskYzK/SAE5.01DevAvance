@@ -4,9 +4,12 @@ import 'screens/camera_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/gallery_screen.dart';
 import 'screens/history_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'screens/community_screen.dart';
 
-void main() {
-  WidgetsFlutterBinding.ensureInitialized(); 
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const ObjectDetectorApp());
 }
 
@@ -28,6 +31,7 @@ class ObjectDetectorApp extends StatelessWidget {
         '/camera': (context) => const CameraScreen(),
         '/gallery': (context) => const GalleryScreen(),
         '/history': (context) => const HistoryScreen(),
+        '/community': (context) => const CommunityScreen(),
       },
     );
   }

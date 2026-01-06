@@ -88,6 +88,13 @@ class HomeScreen extends StatelessWidget {
                   onTap: () => Navigator.pushNamed(context, '/history'),
                 ),
 
+                _outlineButton(
+                  context,
+                  label: "Communauté (En ligne)",
+                  icon: Icons.public,
+                  onTap: () => Navigator.pushNamed(context, '/community'),
+                ),
+
                 const Spacer(),
 
                 const Text(
