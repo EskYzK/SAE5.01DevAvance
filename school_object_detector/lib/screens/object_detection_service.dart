@@ -44,14 +44,14 @@ class ObjectDetectionService {
   }
 
   // Traitement d'une image statique (depuis la galerie ou photo prise)
-  Future<List<Map<String, dynamic>>> processImage(Uint8List imageBytes) async {
+  Future<List<Map<String, dynamic>>> processImage(Uint8List imageBytes, int width, int height) async {
     if (!_isLoaded) return [];
 
     try {
       final result = await _vision.yoloOnImage(
         bytesList: imageBytes,
-        imageHeight: 1280, // YOLO redimensionnera, mais il faut des valeurs par défaut
-        imageWidth: 720,
+        imageHeight: height, // Utilisation des vraies dimensions
+        imageWidth: width,   // Utilisation des vraies dimensions
         iouThreshold: 0.4,
         confThreshold: 0.2,
         classThreshold: 0.2,
