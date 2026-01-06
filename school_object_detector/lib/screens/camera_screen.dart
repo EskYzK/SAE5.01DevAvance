@@ -26,6 +26,8 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
   List<CameraDescription> _cameras = [];
   int _selectedCameraIndex = 0;
 
+  DateTime? _lastDetectionTime;
+
   @override
   void initState() {
     super.initState();
@@ -71,9 +73,15 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
       if (!mounted) return;
       
       controller.startImageStream((image) {
+        final now = DateTime.now();
         if (!_isBusy) {
-          _isBusy = true;
-          _processFrame(image);
+          if (_lastDetectionTime == null || 
+              now.difference(_lastDetectionTime!) > const Duration(milliseconds: 500)) {
+            
+            _lastDetectionTime = now;
+            _isBusy = true;
+            _processFrame(image);
+          }
         }
       });
 
