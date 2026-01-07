@@ -79,21 +79,11 @@ class HomeScreen extends StatelessWidget {
                   textColor: const Color(0xFF2575FC),
                   onTap: () => Navigator.pushNamed(context, '/gallery'),
                 ),
+                
                 const SizedBox(height: 20),
 
-                _outlineButton(
-                  context,
-                  label: "Voir l’historique",
-                  icon: Icons.history_outlined,
-                  onTap: () => Navigator.pushNamed(context, '/history'),
-                ),
-
-                _outlineButton(
-                  context,
-                  label: "Communauté (En ligne)",
-                  icon: Icons.public,
-                  onTap: () => Navigator.pushNamed(context, '/community'),
-                ),
+                // NOUVEAU : Le menu déroulant remplace les deux boutons précédents
+                _menuDropdownButton(context),
 
                 const Spacer(),
 
@@ -113,6 +103,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+  // Widget principal (inchangé)
   static Widget _mainButton(
     BuildContext context, {
     required String label,
@@ -142,7 +133,6 @@ class HomeScreen extends StatelessWidget {
           children: [
             Icon(icon, color: textColor, size: 20),
             const SizedBox(width: 10),
-            // Modification ici : Ajout de Flexible
             Flexible(
               child: Text(
                 label,
@@ -151,7 +141,6 @@ class HomeScreen extends StatelessWidget {
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
-                // Optionnel : centre le texte s'il passe sur deux lignes
                 textAlign: TextAlign.center, 
               ),
             ),
@@ -161,35 +150,77 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  static Widget _outlineButton(
-    BuildContext context, {
-    required String label,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white, width: 1.8),
+  // NOUVEAU : Widget pour le menu déroulant stylisé
+  static Widget _menuDropdownButton(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white, width: 1.8),
+      ),
+      child: Theme(
+        // Force le style sombre pour le menu popup
+        data: Theme.of(context).copyWith(
+          popupMenuTheme: PopupMenuThemeData(
+            color: const Color(0xFF2575FC), // Fond bleu du menu
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            textStyle: const TextStyle(color: Colors.white),
+          ),
+          iconTheme: const IconThemeData(color: Colors.white),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: Colors.white, size: 18),
-            const SizedBox(width: 10),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+        child: PopupMenuButton<String>(
+          offset: const Offset(0, 60), // Fait apparaître le menu sous le bouton
+          onSelected: (value) {
+            if (value == 'history') {
+              Navigator.pushNamed(context, '/history');
+            } else if (value == 'community') {
+              Navigator.pushNamed(context, '/community');
+            }
+          },
+          itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+            const PopupMenuItem<String>(
+              value: 'history',
+              child: Row(
+                children: [
+                  Icon(Icons.history_outlined, color: Colors.white),
+                  SizedBox(width: 12),
+                  Text('Voir l’historique', style: TextStyle(color: Colors.white, fontSize: 16)),
+                ],
+              ),
+            ),
+            const PopupMenuDivider(height: 1), // Ligne de séparation fine
+            const PopupMenuItem<String>(
+              value: 'community',
+              child: Row(
+                children: [
+                  Icon(Icons.public, color: Colors.white),
+                  SizedBox(width: 12),
+                  Text('Communauté', style: TextStyle(color: Colors.white, fontSize: 16)),
+                ],
               ),
             ),
           ],
+          // L'apparence du bouton "fermé"
+          child: const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.menu, color: Colors.white, size: 18),
+                SizedBox(width: 10),
+                Text(
+                  "Plus d'options",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Spacer(), // Pousse la flèche vers la droite pour équilibrer
+                Icon(Icons.arrow_drop_down, color: Colors.white),
+              ],
+            ),
+          ),
         ),
       ),
     );
