@@ -37,6 +37,9 @@ dependencies:
   camera: ^0.11.3
   flutter_vision: ^2.0.0
   image: ^4.0.17
+  archive: ^3.6.1   # Pour créer le ZIP
+  share_plus: ^10.0.0 # Pour exporter le ZIP (Drive, Mail, Fichiers...)
+  file_picker: ^10.3.8
 
 
   # The following adds the Cupertino Icons font to your application.
