@@ -179,7 +179,8 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
           final fileName = 'capture_${DateTime.now().millisecondsSinceEpoch}.jpg';
           final savedPath = p.join(directory.path, fileName);
           
-          await File(savedPath).writeAsBytes(img.encodeJpg(fixedImage));
+          //await File(savedPath).writeAsBytes(img.encodeJpg(fixedImage));
+          await File(savedPath).writeAsBytes(img.encodeJpg(fixedImage, quality: 80));
           
           final prefs = await SharedPreferences.getInstance();
           List<String> history = prefs.getStringList('history_images') ?? [];
