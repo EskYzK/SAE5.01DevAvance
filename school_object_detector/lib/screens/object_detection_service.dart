@@ -9,21 +9,18 @@ class ObjectDetectionService {
   Future<void> initialize() async {
     _vision = FlutterVision();
     
-    // Chargement du modèle YOLOv8 et des étiquettes
     await _vision.loadYoloModel(
       modelPath: 'assets/ml/model.tflite',
       labels: 'assets/ml/labels.txt', 
-      modelVersion: "yolov8", // Indispensable pour que la librairie comprenne le format
+      modelVersion: "yolov8",
       numThreads: 2, 
-      useGpu: true, // Active l'accélération graphique si possible
-      quantization: false, // false car tu as exporté en float32
+      useGpu: true,
+      quantization: false,
     );
     
     _isLoaded = true;
-    print("Modèle YOLOv8 chargé avec succès via flutter_vision !");
   }
 
-  // Traitement optimisé pour le flux vidéo (CameraImage)
   Future<List<Map<String, dynamic>>> processFrame(CameraImage cameraImage) async {
     if (!_isLoaded) return [];
 
@@ -32,39 +29,35 @@ class ObjectDetectionService {
         bytesList: cameraImage.planes.map((plane) => plane.bytes).toList(),
         imageHeight: cameraImage.height,
         imageWidth: cameraImage.width,
-        iouThreshold: 0.4, // Fusionne les rectangles qui se chevauchent trop
-        confThreshold: 0.5, // Ne garde que ce qui est sûr à 50% minimum
+        iouThreshold: 0.4,
+        confThreshold: 0.5,
         classThreshold: 0.5,
       );
       return result;
     } catch (e) {
-      print('Erreur détection YOLO: $e');
       return [];
     }
   }
 
-  // Traitement d'une image statique (depuis la galerie ou photo prise)
   Future<List<Map<String, dynamic>>> processImage(Uint8List imageBytes, int width, int height) async {
     if (!_isLoaded) return [];
 
     try {
       final result = await _vision.yoloOnImage(
         bytesList: imageBytes,
-        imageHeight: height, // Utilisation des vraies dimensions
-        imageWidth: width,   // Utilisation des vraies dimensions
+        imageHeight: height,
+        imageWidth: width,
         iouThreshold: 0.4,
-        confThreshold: 0.2,
-        classThreshold: 0.2,
+        confThreshold: 0.5,
+        classThreshold: 0.5,
       );
       return result;
     } catch (e) {
-      print('Erreur détection image fixe: $e');
       return [];
     }
   }
 
   void dispose() async {
-    // Nettoyage de la mémoire
     if (_isLoaded) {
       await _vision.closeYoloModel();
     }

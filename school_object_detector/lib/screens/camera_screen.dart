@@ -77,7 +77,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
         final now = DateTime.now();
         if (!_isBusy) {
           if (_lastDetectionTime == null || 
-              now.difference(_lastDetectionTime!) > const Duration(milliseconds: 500)) {
+              now.difference(_lastDetectionTime!) > const Duration(milliseconds: 200)) {
             
             _lastDetectionTime = now;
             _isBusy = true;
