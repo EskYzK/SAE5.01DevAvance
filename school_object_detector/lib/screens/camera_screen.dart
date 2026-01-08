@@ -179,7 +179,6 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
           final fileName = 'capture_${DateTime.now().millisecondsSinceEpoch}.jpg';
           final savedPath = p.join(directory.path, fileName);
           
-          //await File(savedPath).writeAsBytes(img.encodeJpg(fixedImage));
           await File(savedPath).writeAsBytes(img.encodeJpg(fixedImage, quality: 80));
           
           final prefs = await SharedPreferences.getInstance();
@@ -244,9 +243,8 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(ctx); // Ferme la boîte de dialogue
+              Navigator.pop(ctx);
               
-              // Affiche un chargement
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text("Envoi en cours...")),
               );
@@ -295,10 +293,8 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 1. La Vue Caméra
           CameraPreview(_controller!),
           
-          // 2. Les rectangles (si détection temps réel)
           if (_imageSize != null)
             CustomPaint(
               painter: ObjectPainter(
@@ -308,7 +304,6 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
               ),
             ),
             
-          // 3. Bouton Retour (Rétabli comme à l'origine)
           Positioned(
             top: 50, left: 20,
             child: ElevatedButton.icon(
@@ -322,34 +317,31 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
             ),
           ),
 
-          // 4. Bouton Switch Caméra (Rétabli comme à l'origine)
           Positioned(
             top: 50, right: 20,
             child: FloatingActionButton(
               heroTag: 'SwitchCam',
-              mini: true, // Un peu plus petit pour laisser la vedette au déclencheur
               backgroundColor: Colors.white,
               onPressed: _switchCamera,
               child: const Icon(Icons.cameraswitch, color: Color(0xFF6A11CB)),
             ),
           ),
 
-          // 5. NOUVEAU : Bouton Photo (Style cohérent "Material Design")
           Positioned(
             bottom: 100,
             left: 0,
             right: 0,
             child: Center(
               child: SizedBox(
-                width: 80, // Plus grand que la normale
+                width: 80,
                 height: 80,
                 child: FloatingActionButton(
                   heroTag: 'TakePhoto',
-                  backgroundColor: const Color(0xFF6A11CB), // Violet de l'appli
-                  foregroundColor: Colors.white, // Icône blanche
+                  backgroundColor: const Color(0xFF6A11CB),
+                  foregroundColor: Colors.white,
                   elevation: 8,
                   onPressed: _takePictureAndAnalyze,
-                  shape: const CircleBorder(), // Bien rond
+                  shape: const CircleBorder(),
                   child: _isBusy 
                     ? const CircularProgressIndicator(color: Colors.white)
                     : const Icon(Icons.camera_alt, size: 36),

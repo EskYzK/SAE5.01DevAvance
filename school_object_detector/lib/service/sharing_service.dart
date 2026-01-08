@@ -15,14 +15,8 @@ class SharingService {
     required double confidence,
   }) async {
     try {
-      print("🚀 1. Démarrage du service de partage");
-      print("   - Fichier : ${imageFile.path}");
-      print("   - Taille : ${await imageFile.length()} octets");
-
       String fileName = "detect_${DateTime.now().millisecondsSinceEpoch}.jpg";
       Reference ref = _storage.ref().child("uploads").child(fileName);
-
-      print("📂 2. Référence créée : uploads/$fileName");
 
       UploadTask task = ref.putFile(
         imageFile,
@@ -31,16 +25,12 @@ class SharingService {
 
       task.snapshotEvents.listen((TaskSnapshot snapshot) {
         double progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        print("⏳ Upload en cours... ${progress.toStringAsFixed(1)}%");
       }, onError: (e) {
-        print("❌ Erreur pendant le flux d'upload : $e");
       });
 
       await task;
-      print("✅ 3. Upload terminé avec succès !");
 
       String imageUrl = await ref.getDownloadURL();
-      print("🔗 4. URL obtenue : $imageUrl");
 
       await _firestore.collection('detections').add({
         'imageUrl': imageUrl,
@@ -49,13 +39,10 @@ class SharingService {
         'timestamp': FieldValue.serverTimestamp(),
       });
       
-      print("🎉 5. Tout est fini !");
       
     } on FirebaseException catch (e) {
-      print("❌ ERREUR FIREBASE : [${e.code}] - ${e.message}");
       rethrow;
     } catch (e) {
-      print("❌ ERREUR GÉNÉRALE : $e");
       rethrow;
     }
   }
