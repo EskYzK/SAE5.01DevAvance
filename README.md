@@ -1,116 +1,116 @@
-# SAE5.01DevAvance
-Dépôt du projet de la SAE 5.01 de Développement avancé | Développement d'une application de reconnaissance et de classement d'objets du monde réel en temps réel - Sujet choisi : Matériel scolaire  
-Membres : CHOLLET Thomas / AIT BAHA Said / MORINON Lilian / KERBER Alexandre
+# 🎒 School Object Detector (SAE 5.01)
 
-# 📘 Fiche Git – Organisation du projet SAE5.01DevAvance
+> Application mobile de reconnaissance et de classement de matériel scolaire en temps réel avec apprentissage actif.
 
-## 👥 Équipe
-| Membre | Branche personnelle |
-|:--------|:--------------------|
-| **Membre 1** | `membre1_branch` |
-| **Membre 2** | `membre2_branch` |
-| **Membre 3** | `membre3_branch` |
-| **Membre 4** | `membre4_branch` |
+## 📖 À propos du projet
 
-> 💡 Chaque membre crée sa propre branche pour travailler sur sa partie sans modifier le code principal (`main`).
+Ce projet a été réalisé dans le cadre de la **SAE 5.01 - Développement Avancé**. L'objectif est de développer une application mobile capable de détecter, identifier et classer des objets du monde réel (ici, du matériel scolaire) en temps réel via la caméra du smartphone.
 
----
+La particularité de cette application est son cycle d'**Apprentissage Actif (Active Learning)** : les utilisateurs peuvent capturer des images d'objets mal détectés pour ré-entraîner l'IA et améliorer ses performances au fil du temps.
 
-## ⚙️ Étapes pour travailler et pousser son code
+### 👥 L'Équipe
 
-### 🧭 1️⃣ Mettre à jour le projet avant de commencer
-Toujours commencer par récupérer la dernière version du code commun :
+| Membre | Rôle |
+| --- | --- |
+| **CHOLLET Thomas** | Développeur |
+| **AIT BAHA Said** | Développeur |
+| **MORINON Lilian** | Développeur |
+| **KERBER Alexandre** | Développeur |
+
+
+## ✨ Fonctionnalités Principales
+
+* **🕵️ Détection en Temps Réel :** Identification instantanée des objets (stylos, règles, gommes, etc.) via le flux caméra grâce à un modèle YOLOv8 embarqué (TFLite).
+* **📸 Collecte de Données :** Interface dédiée pour prendre des photos d'objets spécifiques, générer des datasets et les exporter (ZIP) pour l'amélioration du modèle.
+* **🧠 Mise à jour du Modèle :** Possibilité d'importer un nouveau modèle `.tflite` mis à jour directement depuis l'application sans réinstallation.
+* **☁️ Cloud & Historique :** Intégration avec Firebase pour le stockage et historique des détections.
+* **📤 Partage :** Export facile des datasets vers Google Drive ou par email.
+
+
+## 🛠️ Stack Technique
+
+### Mobile (Flutter)
+
+* **Framework :** Flutter (Dart)
+* **Vision par ordinateur :** `flutter_vision` (YOLOv8), `camera`
+* **Backend & Data :** Firebase (Core, Firestore, Storage)
+* **Utilitaires :** `archive` (Zip), `share_plus`, `path_provider`
+
+### Intelligence Artificielle (Kaggle / Python)
+
+* **Modèle :** YOLOv8 (Ultralytics)
+* **Format Mobile :** TensorFlow Lite (Float32)
+* **Entraînement :** Scripts Python exécutés sur Kaggle (GPU T4 x2)
+
+
+## 🚀 Installation et Démarrage
+
+### Prérequis
+
+* Flutter SDK (v3.9.2 ou supérieur)
+* Un appareil Android (Les émulateurs ne supportent pas la détection par IA)
+
+### Étapes
+
+1. **Cloner le dépôt :**
 ```bash
-git checkout main
-git pull
+git clone https://github.com/votre-repo/SAE5.01DevAvance.git
+cd SAE5.01DevAvance/school_object_detector
 ```
 
----
 
-### 🌱 2️⃣ Créer ou se placer sur sa branche personnelle
-Si c’est la **première fois** que vous créez votre branche :
+2. **Installer les dépendances :**
 ```bash
-git checkout -b membreX_branch
+flutter pub get
 ```
 
-Si la branche existe déjà :
+
+3. **Configuration Firebase :**
+* Assurez-vous que le fichier `google-services.json` est bien présent dans `android/app/` (déjà inclus dans le dépôt, mais à vérifier si vous changez de projet Firebase).
+
+
+4. **Lancer l'application :**
 ```bash
-git checkout membreX_branch
+flutter run
 ```
 
----
 
-### 💾 3️⃣ Ajouter et enregistrer vos modifications
-Quand vous avez fait des changements :
-```bash
-git add .
-git commit -m ":emoji: Description courte de ce qui a été fait"
+## 🔄 Cycle de Ré-entraînement (Active Learning)
+
+Ce projet inclut une procédure complète pour permettre à l'utilisateur d'améliorer l'IA. Voir le guide complet ici : [📄 Procédure de Ré-entraînement](R%C3%A9-entrainement/Proc%C3%A9dure.md).
+
+**En résumé :**
+
+1. **Collecte :** Dans l'app, menu "Collecte de données" > Prendre des photos > Exporter le ZIP.
+2. **Entraînement :** Sur Kaggle, uploader le `base.zip` (historique) + `new_data.zip` (nouvelles photos) et lancer le script fourni.
+3. **Déploiement :** Récupérer le `updated_model.tflite` généré et l'importer dans l'application via le menu "Importer modèle".
+
+
+## 📂 Architecture du Projet
+
+```
+SAE5.01DevAvance/
+├── Comptes-rendus/          # Suivi de projet (PDF)
+├── Ré-entrainement/         # Scripts et documentation IA
+│   └── Procédure.md         # Tutoriel de mise à jour du modèle
+├── school_object_detector/  # Code source de l'application Flutter
+│   ├── android/             # Configuration native Android
+│   ├── assets/
+│   │   └── ml/              # Modèles TFLite et labels
+│   ├── lib/
+│   │   ├── screens/         # Écrans (Camera, Home, Collection...)
+│   │   ├── service/         # Services (Partage, Détection...)
+│   │   └── main.dart        # Point d'entrée
+│   └── pubspec.yaml         # Dépendances
+└── README.md                # Ce fichier
 ```
 
-Exemples :
-- ":sparkles: Ajout de la page d'accueil Flutter"
-- ":sparkles: Création du script d'entraînement TensorFlow"
-- ":memo: Mise à jour du README"
 
-> 💡 Vous pouvez vous rendre sur https://gitmoji.dev afin de trouver un emoji adapté au commit que vous souhaitez faire
+## 🤝 Contribution & Workflow Git
 
----
+Pour travailler sur le projet, merci de respecter le flux suivant :
 
-### ☁️ 4️⃣ Envoyer (push) vos changements sur GitHub
-Si c’est la **première fois** que vous poussez votre branche :
-```bash
-git push --set-upstream origin membreX_branch
-```
-
-Pour les fois suivantes :
-```bash
-git push
-```
-
----
-
-### 🔄 5️⃣ Mettre à jour votre branche avec les derniers changements de `main`
-Quand quelqu’un a modifié `main`, synchronisez avant de continuer :
-```bash
-git checkout main
-git pull
-git checkout membreX_branch
-git merge main
-```
-
-➡️ Cela intègre les nouveautés sans écraser votre travail.
-
----
-
-### 🧩 6️⃣ Quand une partie est terminée
-Quand votre partie est prête :
-- Créez une **Pull Request** sur GitHub vers `main`,  
-  *ou*
-- Demandez à un membre de faire le merge localement :
-```bash
-git checkout main
-git pull
-git merge membreX_branch
-git push
-```
-
----
-
-## 🧠 Récapitulatif rapide
-
-| Action | Commande |
-|--------|-----------|
-| 🆕 Mettre à jour le projet | `git pull` |
-| 🌿 Créer une branche perso | `git checkout -b nom_branche` |
-| 🔁 Changer de branche | `git checkout nom_branche` |
-| 💾 Sauvegarder les changements | `git add . && git commit -m "message"` |
-| ☁️ Envoyer sur GitHub | `git push` |
-| 🔄 Fusionner avec main | `git merge main` |
-
----
-
-> ✨ **Conseil d’équipe :**
-> - Travaillez chacun sur votre branche.  
-> - Faites un `git pull` avant chaque session de code.  
-> - Poussez vos changements régulièrement (petits commits fréquents > gros commits rares).  
-> - Utilisez les *Pull Requests* GitHub pour valider avant de fusionner dans `main`.
+1. Toujours partir de `main` : `git checkout main && git pull`
+2. Créer sa branche : `git checkout -b feature/ma-fonctionnalite`
+3. Commit avec des emojis explicites (ex: `:sparkles:`, `:bug:`)
+4. Push et créer une **Pull Request** pour validation.
