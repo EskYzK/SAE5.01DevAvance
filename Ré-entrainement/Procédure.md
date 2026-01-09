@@ -35,14 +35,15 @@ L'objectif est de capturer des images d'un objet mal détecté pour enrichir le 
 
 ## 3️⃣ Phase d'Entraînement (Sur Kaggle) 🧠
 
-1. Ouvrir un nouveau Notebook Kaggle.
-2. Dans la section **Input** (colonne de droite), cliquer sur **Upload** > **New Dataset**, et uploader les deux fichiers :
+1. Aller sur Kaggle, ajouter un numéro de téléphone et le vérifier (nécessaire pour accéder aux GPU T4).
+2. Ouvrir un nouveau Notebook Kaggle.
+3. Dans la section **Input** (colonne de droite), cliquer sur **Upload** > **New Dataset**, et uploader les deux fichiers :
 * `base.zip` (La mémoire à long terme).
 * `new_data.zip` (Les nouvelles données fraîches).
-3. Nommer ce dataset : `dataset-X`, où X est le numéro que vous souhaitez donner à votre dataset. Si c'est le premier ré-entrainement que vous faites, vous pouvez le nommer `dataset-1`.
-4. Créer ce dataset.
-5. En haut à gauche, aller dans **Settings** > **Accelerator** > **GPU T4 x2** ⚠️.
-6. Lancer le **Script d'Entraînement Automatique**.
+4. Nommer ce dataset : `dataset-X`, où X est le numéro que vous souhaitez donner à votre dataset. Si c'est le premier ré-entrainement que vous faites, vous pouvez le nommer `dataset-1`.
+5. Créer ce dataset.
+6. En haut à gauche, aller dans **Settings** > **Accelerator** > **GPU T4 x2** ⚠️.
+7. Lancer le **Script d'Entraînement Automatique**.
 * *Le script va fusionner les datasets, configurer YOLO, et lancer le ré-entrainement sur 30 epochs.*
 * *Vous pourrez ensuite récupérer le nouveau modèle ainsi que la nouvelle base de ré-entrainement.*
 ```
@@ -206,8 +207,8 @@ if __name__ == '__main__':
 ```
 
 
-7. Attendre la fin de l'exécution (~135 minutes).
-8. Dans la section **Output**, recharger le dossier `/kaggle/working`, et télécharger les deux fichiers générés :
+8. Attendre la fin de l'exécution (~135 minutes).
+9. Dans la section **Output**, recharger le dossier `/kaggle/working`, et télécharger les deux fichiers générés :
 * 📄 **`updated_model.tflite`** : Le modèle optimisé pour Android.
 * 📄 **`new_base.zip`** : Le nouveau fichier de base (pour la prochaine fois).
 
