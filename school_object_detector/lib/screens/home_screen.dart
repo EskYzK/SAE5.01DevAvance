@@ -86,7 +86,7 @@ class HomeScreen extends StatelessWidget {
                 const SizedBox(height: 25),
 
                 const Text(
-                  "Reconnaissance d’objets scolaires",
+                  "Scolarize",
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 26,
@@ -97,7 +97,7 @@ class HomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  "Identifiez instantanément les objets du quotidien en classe",
+                  "Identifiez instantanément les objets scolaires du quotidien",
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 16,
