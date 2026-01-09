@@ -25,7 +25,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
   String _resultText = "";
   bool _isAnalyzing = false;
   late ObjectDetectionService _objectDetectionService;
-  List<Map<String, dynamic>> _detections = [];
+
 
   @override
   void initState() {
@@ -44,7 +44,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
         _correctedImageBytes = null; // Reset
         _correctedImageSize = null;
         _resultText = "";
-        _detections = [];
       });
     }
   }
@@ -87,24 +86,45 @@ class _GalleryScreenState extends State<GalleryScreen> {
         final x2 = (box[2] as double).toInt();
         final y2 = (box[3] as double).toInt();
         
-        // Dessin du rectangle (Rouge, épaisseur 4)
+        // Dessin du rectangle (Rouge, épaisseur 3)
         img.drawRect(
           fixedImage, 
           x1: x1, y1: y1, x2: x2, y2: y2, 
           color: img.ColorRgb8(255, 0, 0), 
-          thickness: 4
+          thickness: 3
         );
 
         // Dessin du texte (Si possible)
         // Note: img.arial24 est une police incluse par défaut
         final label = "${detection['tag']} ${(box[4] * 100).toStringAsFixed(0)}%";
+
+        // Estimation de la taille du fond (arial24 ~14px large + padding)
+        int textWidth = label.length * 14 + 12; 
+        int textHeight = 30;
+        
+        // Position Y : Au-dessus, sinon dedans si on dépasse en haut
+        int textY = y1 - textHeight;
+        if (textY < 0) textY = y1 + 4;
+        
+
+        // A. Fond NOIR
+        img.fillRect(
+          fixedImage, 
+          x1: x1, 
+          y1: textY, 
+          x2: x1 + textWidth, 
+          y2: textY + textHeight, 
+          color: img.ColorRgb8(0, 0, 0)
+        );
+
+        // B. Texte BLANC
         img.drawString(
           fixedImage, 
           label, 
           font: img.arial24, 
-          x: x1 + 5, 
-          y: y1 + 5, 
-          color: img.ColorRgb8(255, 0, 0)
+          x: x1 + 6, 
+          y: textY + 3, 
+          color: img.ColorRgb8(255, 255, 255)
         );
       }
 
@@ -121,7 +141,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
       await _addToHistory(savedPath);
 
       setState(() {
-        _detections = detections;
         // On affiche l'image modifiée à l'écran aussi
         _correctedImageBytes = finalBytes; 
         _correctedImageSize = Size(fixedImage.width.toDouble(), fixedImage.height.toDouble());
@@ -221,10 +240,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
                                       child: Stack(
                                         children: [
                                           Image.memory(_correctedImageBytes!), // L'image EXACTE vue par YOLO
-                                          CustomPaint(
-                                            painter: GalleryObjectPainter(_detections),
-                                            size: _correctedImageSize!,
-                                          ),
                                         ],
                                       ),
                                     )
@@ -297,61 +312,4 @@ class _GalleryScreenState extends State<GalleryScreen> {
       ),
     );
   }
-}
-
-class GalleryObjectPainter extends CustomPainter {
-  final List<Map<String, dynamic>> objects;
-
-  GalleryObjectPainter(this.objects);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0
-      ..color = Colors.red; // Cadre rouge comme la caméra
-
-    final Paint textBgPaint = Paint()
-      ..color = Colors.black54
-      ..style = PaintingStyle.fill;
-
-    for (var object in objects) {
-      final box = object["box"]; // [x1, y1, x2, y2, prob]
-      
-      // Ici, plus de calculs savants : les coordonnées correspondent
-      // EXACTEMENT aux pixels de l'image affichée.
-      final double x1 = box[0];
-      final double y1 = box[1];
-      final double x2 = box[2];
-      final double y2 = box[3];
-      
-      final Rect rect = Rect.fromLTRB(x1, y1, x2, y2);
-      canvas.drawRect(rect, paint);
-
-      // Etiquette
-      final String label = "${object['tag']} ${(box[4] * 100).toStringAsFixed(0)}%";
-      final textSpan = TextSpan(
-        text: label,
-        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-      );
-      final textPainter = TextPainter(text: textSpan, textDirection: TextDirection.ltr);
-      textPainter.layout();
-
-      double textY = y1 - 24;
-      if (textY < 0) textY = y1 + 4;
-
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(x1, textY, textPainter.width + 12, 24),
-          const Radius.circular(4),
-        ),
-        textBgPaint,
-      );
-
-      textPainter.paint(canvas, Offset(x1 + 6, textY + 4));
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
