@@ -295,7 +295,7 @@ class HomeScreen extends StatelessWidget {
                 children: [
                   Icon(Icons.download_for_offline, color: Colors.white),
                   SizedBox(width: 12),
-                  Text('Importer Modèle', style: TextStyle(color: Colors.white, fontSize: 16)),
+                  Text('Importer un modèle', style: TextStyle(color: Colors.white, fontSize: 16)),
                 ],
               ),
             ),
