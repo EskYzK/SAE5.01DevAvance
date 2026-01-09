@@ -21,6 +21,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
   late ObjectDetectionService _objectDetectionService;
   
   bool _isBusy = false;
+  bool _isCapturing = false;
   List<Map<String, dynamic>> _detectedObjects = []; 
   Size? _imageSize;
   
@@ -77,7 +78,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
         final now = DateTime.now();
         if (!_isBusy) {
           if (_lastDetectionTime == null || 
-              now.difference(_lastDetectionTime!) > const Duration(milliseconds: 200)) {
+              now.difference(_lastDetectionTime!) > const Duration(milliseconds: 300)) {
             
             _lastDetectionTime = now;
             _isBusy = true;
@@ -121,16 +122,16 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
 
     await oldController?.stopImageStream();
     await oldController?.dispose();
-    await Future.delayed(const Duration(milliseconds: 200));
+    await Future.delayed(const Duration(milliseconds: 300));
     await _initCamera();
     
     if (mounted) setState(() => _isBusy = false);
   }
 
   Future<void> _takePictureAndAnalyze() async {
-    if (_controller == null || !_controller!.value.isInitialized || _isBusy) return;
+    if (_controller == null || !_controller!.value.isInitialized || _isCapturing) return;
 
-    setState(() => _isBusy = true);
+    setState(() => _isCapturing = true);
 
     try {
       await _controller!.stopImageStream();
@@ -202,7 +203,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
       debugPrint("Erreur photo: $e");
     } finally {
       if (mounted) {
-        setState(() => _isBusy = false);
+        setState(() => _isCapturing = false);
         await _controller!.startImageStream((image) {
           if (!_isBusy) {
             _isBusy = true;
@@ -342,7 +343,8 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
                   elevation: 8,
                   onPressed: _takePictureAndAnalyze,
                   shape: const CircleBorder(),
-                  child: _isBusy 
+                  // MODIFICATION ICI : Utiliser _isCapturing au lieu de _isBusy
+                  child: _isCapturing 
                     ? const CircularProgressIndicator(color: Colors.white)
                     : const Icon(Icons.camera_alt, size: 36),
                 ),
