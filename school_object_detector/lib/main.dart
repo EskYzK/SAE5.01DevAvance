@@ -1,5 +1,6 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'screens/camera_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/gallery_screen.dart';
@@ -11,6 +12,9 @@ import 'screens/dataset_collection_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+  ]);
   runApp(const ObjectDetectorApp());
 }
 
