@@ -6,6 +6,7 @@ import 'screens/gallery_screen.dart';
 import 'screens/history_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'screens/community_screen.dart';
+import 'screens/dataset_collection_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +33,7 @@ class ObjectDetectorApp extends StatelessWidget {
         '/gallery': (context) => const GalleryScreen(),
         '/history': (context) => const HistoryScreen(),
         '/community': (context) => const CommunityScreen(),
+        '/training': (context) => const DatasetCollectionScreen(),
       },
     );
   }
