@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image/image.dart' as img;
 import '../service/sharing_service.dart';
+import '../service/history_service.dart'; // Assurez-vous d'avoir cet import
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -152,6 +153,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
         );
 
         if (detections.isNotEmpty) {
+          // Dessin des boîtes sur l'image
           for (var detection in detections) {
             final box = detection["box"];
             final x1 = (box[0] as double).toInt();
@@ -214,6 +216,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
     }
   }
 
+  // --- NOUVELLE VERSION DE LA BOITE DE DIALOGUE (Style Classique) ---
   Future<void> _askToShare(File imageFile, List<Map<String, dynamic>> detections) async {
     if (!mounted) return;
 
@@ -227,49 +230,85 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
 
     showDialog(
       context: context,
+      barrierDismissible: false, // On force le choix
       builder: (ctx) => AlertDialog(
-        title: const Text("Partager ?"),
+        title: const Text("Sauvegarder ?"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Image.file(imageFile, height: 150),
             const SizedBox(height: 10),
-            Text("Voulez-vous partager cette détection de '$label' avec la communauté ?"),
+            Text("Objet détecté : $label"),
+            const SizedBox(height: 5),
+            const Text("Où voulez-vous envoyer cette image ?", style: TextStyle(fontSize: 12, color: Colors.grey)),
           ],
         ),
+        actionsAlignment: MainAxisAlignment.spaceBetween,
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Non, garder privé"),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _saveToHistory(imageFile, label, confidence);
+            },
+            child: const Text("Privé (Cloud)", style: TextStyle(color: Colors.grey)),
           ),
+          
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _shareToCommunity(imageFile, label, confidence);
+            },
+            
+            child: const Text("Public (Communauté)"),
+          ),
+
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Envoi en cours...")),
-              );
-
-              try {
-                await SharingService().shareDetection(
-                  imageFile: imageFile,
-                  label: label,
-                  confidence: confidence,
-                );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("✅ Partagé avec succès !")),
-                );
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("Erreur : $e")),
-                );
-              }
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Envoi partout...")));
+              await _saveToHistory(imageFile, label, confidence);
+              await _shareToCommunity(imageFile, label, confidence);
             },
-            child: const Text("Oui, partager"),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6A11CB), foregroundColor: Colors.white),
+            child: const Text("Les deux"),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _saveToHistory(File imageFile, String label, double confidence) async {
+    try {
+      await HistoryService().saveDetection(
+        imageFile: imageFile,
+        label: label,
+        confidence: confidence,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("✅ Sauvegardé dans votre historique !"), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      debugPrint("Erreur history: $e");
+    }
+  }
+
+  Future<void> _shareToCommunity(File imageFile, String label, double confidence) async {
+    try {
+      await SharingService().shareDetection(
+        imageFile: imageFile,
+        label: label,
+        confidence: confidence,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("✅ Partagé avec la communauté !"), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      debugPrint("Erreur share: $e");
+    }
   }
 
   @override
@@ -327,7 +366,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
               child: const Icon(Icons.cameraswitch, color: Color(0xFF6A11CB)),
             ),
           ),
-
+          
           Positioned(
             bottom: 100,
             left: 0,
@@ -343,7 +382,6 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
                   elevation: 8,
                   onPressed: _takePictureAndAnalyze,
                   shape: const CircleBorder(),
-                  // MODIFICATION ICI : Utiliser _isCapturing au lieu de _isBusy
                   child: _isCapturing 
                     ? const CircularProgressIndicator(color: Colors.white)
                     : const Icon(Icons.camera_alt, size: 36),
