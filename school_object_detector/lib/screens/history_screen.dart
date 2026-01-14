@@ -1,157 +1,93 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../service/history_service.dart';
+import 'package:intl/intl.dart';
 
-class HistoryScreen extends StatefulWidget {
+class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
 
   @override
-  State<HistoryScreen> createState() => _HistoryScreenState();
-}
-
-class _HistoryScreenState extends State<HistoryScreen> {
-  List<String> _imagePaths = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadHistory();
-  }
-
-  Future<void> _loadHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _imagePaths = (prefs.getStringList('history_images') ?? []).reversed.toList();
-    });
-  }
-
-  Future<void> _clearHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('history_images');
-    setState(() {
-      _imagePaths = [];
-    });
-  }
-
-  void _showFullImage(String path) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => Scaffold(
-          backgroundColor: Colors.black,
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            iconTheme: const IconThemeData(color: Colors.white),
-            elevation: 0,
-          ),
-          body: Center(
-            child: InteractiveViewer( // Permet de zoomer
-              child: Image.file(File(path)),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final User? user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text("Historique")),
+        body: const Center(child: Text("Connectez-vous pour voir votre historique.")),
+      );
+    }
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
-      appBar: AppBar(
-        title: const Text("Historique"),
-        centerTitle: true,
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
-        foregroundColor: Colors.white,
-        titleTextStyle: const TextStyle(
-          color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600,
-        ),
-        actions: [
-          if (_imagePaths.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.delete_sweep),
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text("Effacer l'historique ?"),
-                    content: const Text("Cette action est irréversible."),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Annuler")),
-                      TextButton(
-                        onPressed: () {
-                          _clearHistory();
-                          Navigator.pop(ctx);
-                        },
-                        child: const Text("Effacer", style: TextStyle(color: Colors.red)),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-        ],
-      ),
-      body: _imagePaths.isEmpty
-          ? Center(
+      appBar: AppBar(title: const Text("Mon Historique Cloud ☁️")),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('User')
+            .doc(user.uid)
+            .collection('history')
+            .orderBy('timestamp', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.history, size: 80, color: Colors.grey[300]),
-                  const SizedBox(height: 16),
-                  const Text(
-                    "Aucune analyse enregistrée",
-                    style: TextStyle(color: Colors.grey, fontSize: 16),
-                  ),
+                  Icon(Icons.history, size: 80, color: Colors.grey),
+                  SizedBox(height: 10),
+                  Text("Aucun scan sauvegardé."),
                 ],
               ),
-            )
-          : GridView.builder(
-              padding: const EdgeInsets.all(12),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2, // 2 images par ligne
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 0.75, // Format un peu vertical
-              ),
-              itemCount: _imagePaths.length,
-              itemBuilder: (context, index) {
-                final path = _imagePaths[index];
-                final file = File(path);
+            );
+          }
 
-                return GestureDetector(
-                  onTap: () => _showFullImage(path),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+          return ListView.builder(
+            itemCount: snapshot.data!.docs.length,
+            itemBuilder: (context, index) {
+              var doc = snapshot.data!.docs[index];
+              var data = doc.data() as Map<String, dynamic>;
+
+              String dateStr = "Date inconnue";
+              if (data['timestamp'] != null) {
+                DateTime date = (data['timestamp'] as Timestamp).toDate();
+                dateStr = DateFormat('dd/MM/yyyy HH:mm').format(date);
+              }
+
+              return Dismissible(
+                key: Key(doc.id),
+                background: Container(color: Colors.red, alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), child: const Icon(Icons.delete, color: Colors.white)),
+                direction: DismissDirection.endToStart,
+                onDismissed: (direction) {
+                  HistoryService().deleteDetection(doc.id, data['imageUrl']);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Supprimé !")));
+                },
+                child: Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  child: ListTile(
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        data['imageUrl'],
+                        width: 60, height: 60, fit: BoxFit.cover,
+                        errorBuilder: (c, e, s) => const Icon(Icons.broken_image),
+                      ),
                     ),
-                    clipBehavior: Clip.hardEdge,
-                    child: file.existsSync()
-                        ? Image.file(
-                            file,
-                            fit: BoxFit.cover,
-                          )
-                        : const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+                    title: Text(
+                      data['label'] ?? "Objet",
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    ),
+                    subtitle: Text("$dateStr\nConfiance: ${((data['confidence'] ?? 0) * 100).toStringAsFixed(1)}%"),
+                    isThreeLine: true,
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
