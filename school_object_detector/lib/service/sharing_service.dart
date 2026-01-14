@@ -24,7 +24,14 @@ class SharingService {
       }
 
       DocumentSnapshot userDoc = await _firestore.collection('User').doc(user.uid).get();
-      String pseudo = userDoc.get('pseudo') ?? 'Anonyme';
+
+      String pseudo = 'Anonyme';
+      if (userDoc.exists) {
+        Map<String, dynamic>? data = userDoc.data() as Map<String, dynamic>?;
+        if (data != null && data.containsKey('pseudo')) {
+          pseudo = data['pseudo'];
+        }
+      }
 
       String fileName = "detect_${DateTime.now().millisecondsSinceEpoch}.jpg";
       Reference ref = _storage.ref().child("uploads").child(fileName);
