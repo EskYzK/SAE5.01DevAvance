@@ -10,6 +10,7 @@ import 'screens/community_screen.dart';
 import 'screens/dataset_collection_screen.dart';
 import 'screens/auth_screen.dart';
 import 'screens/edit_profile_screen.dart';
+import 'screens/forgot_password_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,6 +43,7 @@ class ObjectDetectorApp extends StatelessWidget {
         '/training': (context) => const DatasetCollectionScreen(),
         '/auth': (context) => const AuthScreen(),
         '/edit_profile': (context) => const EditProfileScreen(),
+        '/forgot_password': (context) => const ForgotPasswordScreen(),
       },
     );
   }

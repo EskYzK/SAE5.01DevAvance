@@ -281,6 +281,16 @@ class _AuthScreenState extends State<AuthScreen> {
                   ? "Pas encore de compte ? Créer un compte" 
                   : "Déjà un compte ? Se connecter"),
               ),
+              if (_isLogin)
+                TextButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/forgot_password');
+                  },
+                  child: const Text(
+                    "Mot de passe oublié ?",
+                    style: TextStyle(color: Colors.grey, decoration: TextDecoration.underline),
+                  ),
+                ),
             ],
           ),
         ),

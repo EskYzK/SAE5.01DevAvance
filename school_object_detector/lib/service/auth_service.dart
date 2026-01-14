@@ -109,6 +109,16 @@ class AuthService {
     }
   }
 
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-not-found') {
+        throw Exception("Aucun compte ne correspond à cet email.");
+      }
+      rethrow;
+    }
+  }
 
   Future<void> signOut() async {
     await _auth.signOut();
