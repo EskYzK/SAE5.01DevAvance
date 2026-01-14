@@ -78,6 +78,38 @@ class AuthService {
     }
   }
 
+  Future<void> updatePseudo(String uid, String newPseudo) async {
+    try {
+      await _firestore.collection('User').doc(uid).update({
+        'pseudo': newPseudo,
+      });
+    } catch (e) {
+      throw Exception("Impossible de mettre à jour le pseudo.");
+    }
+  }
+
+  Future<void> updatePassword(String currentPassword, String newPassword) async {
+    User? user = _auth.currentUser;
+    if (user == null || user.email == null) throw Exception("Utilisateur introuvable");
+
+    try {
+      AuthCredential credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+      
+      await user.reauthenticateWithCredential(credential);
+      await user.updatePassword(newPassword);
+      
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'wrong-password') {
+        throw Exception("L'ancien mot de passe est incorrect.");
+      }
+      rethrow;
+    }
+  }
+
+
   Future<void> signOut() async {
     await _auth.signOut();
   }

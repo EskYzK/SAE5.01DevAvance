@@ -195,6 +195,16 @@ class _AuthScreenState extends State<AuthScreen> {
             
             const SizedBox(height: 40),
             
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.pushNamed(context, '/edit_profile');
+              },
+              icon: const Icon(Icons.edit),
+              label: const Text("Modifier mes informations"),
+            ),
+            
+            const SizedBox(height: 10),
+
             ElevatedButton.icon(
               onPressed: () async {
                 await _authService.signOut();
