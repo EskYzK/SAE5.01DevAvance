@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SharingService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -9,12 +10,22 @@ class SharingService {
     bucket: "gs://schoolobjectdetector.firebasestorage.app"
   );
 
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
   Future<void> shareDetection({
     required File imageFile,
     required String label,
     required double confidence,
   }) async {
     try {
+      User? user = _auth.currentUser;
+      if (user == null) {
+        throw Exception("Vous devez être connecté pour partager.");
+      }
+
+      DocumentSnapshot userDoc = await _firestore.collection('User').doc(user.uid).get();
+      String pseudo = userDoc.get('pseudo') ?? 'Anonyme';
+
       String fileName = "detect_${DateTime.now().millisecondsSinceEpoch}.jpg";
       Reference ref = _storage.ref().child("uploads").child(fileName);
 
@@ -37,6 +48,8 @@ class SharingService {
         'label': label,
         'confidence': confidence,
         'timestamp': FieldValue.serverTimestamp(),
+        'userId': user.uid,
+        'userPseudo': pseudo,
       });
       
       
