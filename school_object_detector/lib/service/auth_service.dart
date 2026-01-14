@@ -1,11 +1,15 @@
+import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instanceFor(
+      bucket: "gs://schoolobjectdetector.firebasestorage.app"
+  );
 
-  // Obtenir l'utilisateur actuel
   User? get currentUser => _auth.currentUser;
 
   // Connexion
@@ -13,7 +17,6 @@ class AuthService {
     return await _auth.signInWithEmailAndPassword(email: email, password: password);
   }
 
-  // Inscription + Création de la collection User (VERSION BLINDÉE)
   Future<UserCredential?> signUpWithEmail({
     required String email,
     required String password,
@@ -22,24 +25,18 @@ class AuthService {
     UserCredential? userCredential;
 
     try {
-      // 1. On essaie de créer le compte
       userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
     } catch (e) {
-      // C'EST ICI LE FIX : 
-      // Si on a l'erreur "Pigeon" ou autre bug bizarre, mais que l'utilisateur est quand même créé :
       if (_auth.currentUser != null) {
         print("Bug détecté mais utilisateur créé. On force la création du profil.");
-        // On continue comme si de rien n'était
       } else {
-        // Sinon, c'est une vraie erreur (mdp trop court, etc.), on la relance
         rethrow;
       }
     }
 
-    // 2. Si on arrive ici, c'est que l'utilisateur existe (normalement ou via le rattrapage d'erreur)
     if (_auth.currentUser != null) {
       await _createUserData(_auth.currentUser!, pseudo);
     }
@@ -47,7 +44,6 @@ class AuthService {
     return userCredential;
   }
 
-  // Fonction privée pour créer le document User
   Future<void> _createUserData(User user, String pseudo) async {
     try {
       await _firestore.collection('User').doc(user.uid).set({
@@ -64,7 +60,24 @@ class AuthService {
     }
   }
 
-  // Déconnexion
+  Future<void> updateProfilePicture(String uid, File imageFile) async {
+    try {
+      Reference ref = _storage.ref().child("user_profiles").child("$uid.jpg");
+
+      await ref.putFile(imageFile);
+
+      String photoUrl = await ref.getDownloadURL();
+
+      await _firestore.collection('User').doc(uid).update({
+        'photoUrl': photoUrl,
+      });
+      
+    } catch (e) {
+      print("Erreur upload profil: $e");
+      throw Exception("Impossible de mettre à jour la photo.");
+    }
+  }
+
   Future<void> signOut() async {
     await _auth.signOut();
   }

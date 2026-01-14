@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../service/auth_service.dart'; // Assurez-vous que le chemin est correct
+import '../service/auth_service.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -12,7 +14,7 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   final AuthService _authService = AuthService();
-  bool _isLogin = true; // Pour basculer entre Connexion et Inscription
+  bool _isLogin = true;
   bool _isLoading = false;
 
   final _formKey = GlobalKey<FormState>();
@@ -20,7 +22,6 @@ class _AuthScreenState extends State<AuthScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _pseudoController = TextEditingController();
 
-  // Fonction pour soumettre le formulaire
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -28,25 +29,21 @@ class _AuthScreenState extends State<AuthScreen> {
 
     try {
       if (_isLogin) {
-        // Connexion
         await _authService.signInWithEmail(
           _emailController.text.trim(),
           _passwordController.text.trim(),
         );
       } else {
-        // Inscription
         await _authService.signUpWithEmail(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
           pseudo: _pseudoController.text.trim(),
         );
       }
-      // Si tout se passe bien, on peut fermer la page ou afficher un succès
       if (mounted) {
          ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(_isLogin ? "Bon retour !" : "Bienvenue !"), backgroundColor: Colors.green),
         );
-         // Optionnel : Navigator.pop(context); pour revenir à l'accueil directement
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
@@ -69,24 +66,56 @@ class _AuthScreenState extends State<AuthScreen> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+  
+  Future<void> _updatePhoto(User user) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 70,
+      );
+
+      if (image != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Mise à jour de la photo...")),
+          );
+        }
+
+        await _authService.updateProfilePicture(user.uid, File(image.path));
+
+        if (mounted) {
+          setState(() {
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Photo de profil mise à jour !"), backgroundColor: Colors.green),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Erreur: $e"), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // On écoute l'état de l'utilisateur (Connecté ou non)
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // Si l'utilisateur est connecté, on affiche son profil
         if (snapshot.hasData) {
           return _buildProfileView(snapshot.data!);
         }
-        // Sinon, on affiche le formulaire d'auth
         return _buildAuthForm();
       },
     );
   }
 
-  // VUE PROFIL (Connecté)
   Widget _buildProfileView(User user) {
     return Scaffold(
       appBar: AppBar(title: const Text("Mon Profil")),
@@ -94,32 +123,89 @@ class _AuthScreenState extends State<AuthScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.account_circle, size: 100, color: Colors.deepPurple),
-            const SizedBox(height: 20),
-            // On récupère le pseudo depuis Firestore
-            FutureBuilder<DocumentSnapshot>(
-              future: FirebaseFirestore.instance.collection('User').doc(user.uid).get(),
+            StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance.collection('User').doc(user.uid).snapshots(),
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const CircularProgressIndicator();
-                }
-                String pseudo = "Utilisateur";
-                if (snapshot.hasData && snapshot.data!.exists) {
-                  pseudo = snapshot.data!.get('pseudo') ?? "Utilisateur";
-                }
-                return Text(pseudo, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold));
+                if (!snapshot.hasData) return const CircularProgressIndicator();
+                
+                final data = snapshot.data!.data() as Map<String, dynamic>?;
+                final String? photoUrl = data?['photoUrl'];
+                final String pseudo = data?['pseudo'] ?? "Utilisateur";
+
+                return Column(
+                  children: [
+                    GestureDetector(
+                      onTap: () => _updatePhoto(user),
+                      child: Stack(
+                        children: [
+                          Container(
+                            width: 120,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.grey.shade200,
+                              image: photoUrl != null
+                                  ? DecorationImage(
+                                      image: NetworkImage(photoUrl),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : null,
+                              border: Border.all(color: Colors.deepPurple, width: 3),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 5),
+                                )
+                              ],
+                            ),
+                            child: photoUrl == null
+                                ? const Icon(Icons.person, size: 60, color: Colors.grey)
+                                : null,
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(
+                                color: Colors.deepPurple,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      pseudo,
+                      style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      user.email ?? "",
+                      style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                    ),
+                  ],
+                );
               },
             ),
-            const SizedBox(height: 10),
-            Text(user.email ?? "", style: const TextStyle(color: Colors.grey)),
+            
             const SizedBox(height: 40),
+            
             ElevatedButton.icon(
               onPressed: () async {
                 await _authService.signOut();
               },
               icon: const Icon(Icons.logout),
               label: const Text("Se déconnecter"),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+              ),
             )
           ],
         ),
@@ -127,7 +213,6 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  // VUE FORMULAIRE (Non connecté)
   Widget _buildAuthForm() {
     return Scaffold(
       appBar: AppBar(title: Text(_isLogin ? "Connexion" : "Inscription")),
@@ -140,7 +225,6 @@ class _AuthScreenState extends State<AuthScreen> {
               const Icon(Icons.lock_outline, size: 80, color: Colors.deepPurple),
               const SizedBox(height: 20),
               
-              // Champ Email
               TextFormField(
                 controller: _emailController,
                 decoration: const InputDecoration(labelText: "Email", prefixIcon: Icon(Icons.email)),
@@ -149,7 +233,6 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
               const SizedBox(height: 15),
 
-              // Champ Pseudo (Seulement si Inscription)
               if (!_isLogin) ...[
                 TextFormField(
                   controller: _pseudoController,
@@ -159,7 +242,6 @@ class _AuthScreenState extends State<AuthScreen> {
                 const SizedBox(height: 15),
               ],
 
-              // Champ Mot de passe
               TextFormField(
                 controller: _passwordController,
                 decoration: const InputDecoration(labelText: "Mot de passe", prefixIcon: Icon(Icons.lock)),
@@ -168,7 +250,6 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
               const SizedBox(height: 30),
 
-              // Bouton Valider
               if (_isLoading)
                 const CircularProgressIndicator()
               else
@@ -184,7 +265,6 @@ class _AuthScreenState extends State<AuthScreen> {
               
               const SizedBox(height: 20),
 
-              // Bouton Toggle (Basculer Connexion / Inscription)
               TextButton(
                 onPressed: () => setState(() => _isLogin = !_isLogin),
                 child: Text(_isLogin 
