@@ -9,20 +9,17 @@ class CommunityScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text("Communauté")),
       body: StreamBuilder<QuerySnapshot>(
-        // Écoute en temps réel la collection 'detections'
         stream: FirebaseFirestore.instance
             .collection('detections')
             .orderBy('timestamp', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.hasError) return const Center(child: Text("Erreur de chargement"));
+          if (snapshot.hasError) return const Center(child: Text("Erreur"));
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-
           final docs = snapshot.data!.docs;
-
-          if (docs.isEmpty) return const Center(child: Text("Aucun partage pour le moment."));
+          if (docs.isEmpty) return const Center(child: Text("Aucun partage."));
 
           return ListView.builder(
             itemCount: docs.length,
@@ -32,22 +29,35 @@ class CommunityScreen extends StatelessWidget {
               return Card(
                 margin: const EdgeInsets.all(10),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Affiche l'image depuis Internet
+                    ListTile(
+                      leading: CircleAvatar(child: Icon(Icons.person)),
+                      title: Text(data['userPseudo'] ?? 'Utilisateur inconnu'),
+                      trailing: Text(
+                        "Posté récemment", 
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ),
                     if (data['imageUrl'] != null)
                       Image.network(
                         data['imageUrl'],
                         height: 200,
                         width: double.infinity,
                         fit: BoxFit.cover,
-                        loadingBuilder: (ctx, child, loading) {
-                          if (loading == null) return child;
-                          return const SizedBox(height: 200, child: Center(child: CircularProgressIndicator()));
-                        },
                       ),
-                    ListTile(
-                      title: Text(data['label'] ?? 'Inconnu'),
-                      subtitle: Text("Confiance : ${((data['confidence'] ?? 0) * 100).toStringAsFixed(1)}%"),
+                    Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            data['label'] ?? 'Inconnu',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                          Text("Confiance : ${((data['confidence'] ?? 0) * 100).toStringAsFixed(1)}%"),
+                        ],
+                      ),
                     ),
                   ],
                 ),
