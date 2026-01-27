@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../service/history_service.dart';
 import 'package:intl/intl.dart';
+import '../widgets/full_screen_image_viewer.dart';
 
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
@@ -56,6 +57,8 @@ class HistoryScreen extends StatelessWidget {
                 dateStr = DateFormat('dd/MM/yyyy HH:mm').format(date);
               }
 
+              final imageUrl = data['imageUrl'] ?? '';
+
               return Dismissible(
                 key: Key(doc.id),
                 background: Container(color: Colors.red, alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), child: const Icon(Icons.delete, color: Colors.white)),
@@ -67,12 +70,30 @@ class HistoryScreen extends StatelessWidget {
                 child: Card(
                   margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   child: ListTile(
-                    leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        data['imageUrl'],
-                        width: 60, height: 60, fit: BoxFit.cover,
-                        errorBuilder: (c, e, s) => const Icon(Icons.broken_image),
+                    leading: GestureDetector(
+                      onTap: () {
+                        if (imageUrl.isNotEmpty) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => FullScreenImageViewer(
+                                imagePath: imageUrl,
+                                heroTag: doc.id, 
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                      child: Hero(
+                        tag: doc.id,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            imageUrl,
+                            width: 60, height: 60, fit: BoxFit.cover,
+                            errorBuilder: (c, e, s) => const Icon(Icons.broken_image),
+                          ),
+                        ),
                       ),
                     ),
                     title: Text(
