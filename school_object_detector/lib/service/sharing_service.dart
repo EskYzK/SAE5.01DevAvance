@@ -26,10 +26,17 @@ class SharingService {
       DocumentSnapshot userDoc = await _firestore.collection('User').doc(user.uid).get();
 
       String pseudo = 'Anonyme';
+      String? photoProfileUrl = user.photoURL;
+
       if (userDoc.exists) {
         Map<String, dynamic>? data = userDoc.data() as Map<String, dynamic>?;
-        if (data != null && data.containsKey('pseudo')) {
-          pseudo = data['pseudo'];
+        if (data != null) {
+          if (data.containsKey('pseudo')) {
+            pseudo = data['pseudo'];
+          }
+          if (photoProfileUrl == null && data.containsKey('photoUrl')) {
+             photoProfileUrl = data['photoUrl'];
+          }
         }
       }
 
@@ -40,11 +47,6 @@ class SharingService {
         imageFile,
         SettableMetadata(contentType: 'image/jpeg'),
       );
-
-      task.snapshotEvents.listen((TaskSnapshot snapshot) {
-        double progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-      }, onError: (e) {
-      });
 
       await task;
 
@@ -57,9 +59,8 @@ class SharingService {
         'timestamp': FieldValue.serverTimestamp(),
         'userId': user.uid,
         'userPseudo': pseudo,
-        'userPhotoUrl': user.photoURL,
+        'userPhotoUrl': photoProfileUrl, 
       });
-      
       
     } on FirebaseException catch (e) {
       rethrow;

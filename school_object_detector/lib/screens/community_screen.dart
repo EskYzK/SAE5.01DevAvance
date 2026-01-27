@@ -51,8 +51,9 @@ class CommunityScreen extends StatelessWidget {
               final String label = data['label'] ?? 'Objet inconnu';
               final double confidence = (data['confidence'] ?? 0.0).toDouble();
               final String userPseudo = data['userPseudo'] ?? 'Anonyme';
-              final String? userPhotoUrl = data['userPhotoUrl'];
               final String docId = docs[index].id;
+
+              final String? userPhotoUrl = data['userPhotoUrl'];
 
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -62,7 +63,6 @@ class CommunityScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 1. EN-TÊTE (Utilisateur)
                     ListTile(
                       leading: CircleAvatar(
                         backgroundColor: Colors.blueAccent.withOpacity(0.2),
