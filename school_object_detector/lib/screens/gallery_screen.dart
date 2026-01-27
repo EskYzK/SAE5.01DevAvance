@@ -8,6 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image/image.dart' as img; 
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import '../service/sharing_service.dart';
+import '../service/history_service.dart';
 
 class GalleryScreen extends StatefulWidget {
   const GalleryScreen({super.key});
@@ -18,7 +20,6 @@ class GalleryScreen extends StatefulWidget {
 
 class _GalleryScreenState extends State<GalleryScreen> {
   File? _selectedImage;
-  // On ajoute une variable pour stocker l'image corrigée (droite)
   Uint8List? _correctedImageBytes; 
   Size? _correctedImageSize;
 
@@ -41,7 +42,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
     if (picked != null) {
       setState(() {
         _selectedImage = File(picked.path);
-        _correctedImageBytes = null; // Reset
+        _correctedImageBytes = null;
         _correctedImageSize = null;
         _resultText = "";
       });
@@ -49,128 +50,220 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 
   Future<void> _analyzeImage() async {
-  if (_selectedImage == null) return;
+    if (_selectedImage == null) return;
 
-  setState(() {
-    _isAnalyzing = true;
-    _resultText = "Analyse en cours...";
-  });
+    setState(() {
+      _isAnalyzing = true;
+      _resultText = "Analyse en cours...";
+    });
 
-  try {
-    final rawBytes = await _selectedImage!.readAsBytes();
+    try {
+      final rawBytes = await _selectedImage!.readAsBytes();
 
-    // 1. On décode et on corrige l'orientation
-    img.Image? originalImage = img.decodeImage(rawBytes);
-    
-    if (originalImage != null) {
-      // "Cuisson" de l'orientation (remet l'image droite pour de bon)
-      img.Image fixedImage = img.bakeOrientation(originalImage);
+      img.Image? originalImage = img.decodeImage(rawBytes);
+      
+      if (originalImage != null) {
+        img.Image fixedImage = img.bakeOrientation(originalImage);
 
-      // 2. Analyse par l'IA
-      // On encode en JPG pour l'envoyer à l'IA
-      final fixedBytes = img.encodeJpg(fixedImage);
-      final detections = await _objectDetectionService.processImage(
-        fixedBytes, 
-        fixedImage.width, 
-        fixedImage.height
-      );
-
-      // 3. DESSIN DES RECTANGLES SUR L'IMAGE (La partie magique)
-      // On dessine directement sur 'fixedImage' qui sera sauvegardée
-      for (var detection in detections) {
-        final box = detection["box"]; // [x1, y1, x2, y2, prob]
-        
-        // Conversion en entiers pour la librairie 'image'
-        final x1 = (box[0] as double).toInt();
-        final y1 = (box[1] as double).toInt();
-        final x2 = (box[2] as double).toInt();
-        final y2 = (box[3] as double).toInt();
-        
-        // Dessin du rectangle (Rouge, épaisseur 3)
-        img.drawRect(
-          fixedImage, 
-          x1: x1, y1: y1, x2: x2, y2: y2, 
-          color: img.ColorRgb8(255, 0, 0), 
-          thickness: 3
+        final fixedBytes = img.encodeJpg(fixedImage);
+        final detections = await _objectDetectionService.processImage(
+          fixedBytes, 
+          fixedImage.width, 
+          fixedImage.height
         );
 
-        // Dessin du texte (Si possible)
-        // Note: img.arial24 est une police incluse par défaut
-        final label = "${detection['tag']} ${(box[4] * 100).toStringAsFixed(0)}%";
+        for (var detection in detections) {
+          final box = detection["box"];
+          
+          final x1 = (box[0] as double).toInt();
+          final y1 = (box[1] as double).toInt();
+          final x2 = (box[2] as double).toInt();
+          final y2 = (box[3] as double).toInt();
+          
+          img.drawRect(
+            fixedImage, 
+            x1: x1, y1: y1, x2: x2, y2: y2, 
+            color: img.ColorRgb8(255, 0, 0), 
+            thickness: 3
+          );
 
-        // Estimation de la taille du fond (arial24 ~14px large + padding)
-        int textWidth = label.length * 14 + 12; 
-        int textHeight = 30;
+          final label = "${detection['tag']} ${(box[4] * 100).toStringAsFixed(0)}%";
+
+          int textWidth = label.length * 14 + 12; 
+          int textHeight = 30;
+          
+          int textY = y1 - textHeight;
+          if (textY < 0) textY = y1 + 4;
+          
+
+          img.fillRect(
+            fixedImage, 
+            x1: x1, 
+            y1: textY, 
+            x2: x1 + textWidth, 
+            y2: textY + textHeight, 
+            color: img.ColorRgb8(0, 0, 0)
+          );
+
+          img.drawString(
+            fixedImage, 
+            label, 
+            font: img.arial24, 
+            x: x1 + 6, 
+            y: textY + 3, 
+            color: img.ColorRgb8(255, 255, 255)
+          );
+        }
+
+        final directory = await getApplicationDocumentsDirectory();
+        final fileName = 'analyse_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final savedPath = p.join(directory.path, fileName);
         
-        // Position Y : Au-dessus, sinon dedans si on dépasse en haut
-        int textY = y1 - textHeight;
-        if (textY < 0) textY = y1 + 4;
-        
+        final finalBytes = img.encodeJpg(fixedImage);
+        final fileSaved = File(savedPath);
+        await fileSaved.writeAsBytes(finalBytes);
 
-        // A. Fond NOIR
-        img.fillRect(
-          fixedImage, 
-          x1: x1, 
-          y1: textY, 
-          x2: x1 + textWidth, 
-          y2: textY + textHeight, 
-          color: img.ColorRgb8(0, 0, 0)
-        );
+        await _addToLocalHistory(savedPath);
 
-        // B. Texte BLANC
-        img.drawString(
-          fixedImage, 
-          label, 
-          font: img.arial24, 
-          x: x1 + 6, 
-          y: textY + 3, 
-          color: img.ColorRgb8(255, 255, 255)
-        );
+        setState(() {
+          _correctedImageBytes = finalBytes; 
+          _correctedImageSize = Size(fixedImage.width.toDouble(), fixedImage.height.toDouble());
+          
+          if (detections.isNotEmpty) {
+             _resultText = "Objets détectés et image sauvegardée !";
+          } else {
+            _resultText = "✅ Aucun objet scolaire détecté.";
+          }
+        });
+
+        if (detections.isNotEmpty && mounted) {
+           _askToShare(fileSaved, detections);
+        }
       }
 
-      // 4. Sauvegarde de l'image annotée dans le téléphone
-      final directory = await getApplicationDocumentsDirectory();
-      final fileName = 'analyse_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final savedPath = p.join(directory.path, fileName);
-      
-      // On écrit le fichier modifié sur le disque
-      final finalBytes = img.encodeJpg(fixedImage);
-      await File(savedPath).writeAsBytes(finalBytes);
-
-      // 5. On ajoute le chemin de l'image MODIFIÉE à l'historique
-      await _addToHistory(savedPath);
-
+    } catch (e) {
+      debugPrint('Erreur lors de l\'analyse: $e');
       setState(() {
-        // On affiche l'image modifiée à l'écran aussi
-        _correctedImageBytes = finalBytes; 
-        _correctedImageSize = Size(fixedImage.width.toDouble(), fixedImage.height.toDouble());
-        
-        if (detections.isNotEmpty) {
-           _resultText = "Objets détectés et image sauvegardée !";
-        } else {
-          _resultText = "✅ Aucun objet scolaire détecté.";
-        }
+        _resultText = "❌ Erreur : $e";
+      });
+    } finally {
+      setState(() {
+        _isAnalyzing = false;
       });
     }
-
-  } catch (e) {
-    debugPrint('Erreur lors de l\'analyse: $e');
-    setState(() {
-      _resultText = "❌ Erreur : $e";
-    });
-  } finally {
-    setState(() {
-      _isAnalyzing = false;
-    });
   }
-}
 
-  Future<void> _addToHistory(String path) async {
+  Future<void> _addToLocalHistory(String path) async {
     final prefs = await SharedPreferences.getInstance();
     List<String> history = prefs.getStringList('history_images') ?? [];
     history.remove(path);
     history.add(path);
     await prefs.setStringList('history_images', history);
+  }
+
+
+  Future<void> _askToShare(File imageFile, List<Map<String, dynamic>> detections) async {
+    if (!mounted) return;
+
+    String label = "Objet inconnu";
+    double confidence = 0.0;
+    
+    if (detections.isNotEmpty) {
+      label = detections[0]['tag'];
+      confidence = detections[0]['box'][4];
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Sauvegarder ?"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.memory(_correctedImageBytes!, height: 150), 
+            const SizedBox(height: 10),
+            Text("Objet détecté : $label"),
+            const SizedBox(height: 5),
+            const Text("Où voulez-vous envoyer cette image ?", style: TextStyle(fontSize: 12, color: Colors.grey)),
+          ],
+        ),
+        actionsAlignment: MainAxisAlignment.spaceBetween,
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _saveToCloudHistory(imageFile, label, confidence);
+            },
+            child: const Text("Privé (Cloud)", style: TextStyle(color: Colors.grey)),
+          ),
+          
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _shareToCommunity(imageFile, label, confidence);
+            },
+            
+            child: const Text("Public (Communauté)"),
+          ),
+
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Envoi partout...")));
+              await _saveToCloudHistory(imageFile, label, confidence);
+              await _shareToCommunity(imageFile, label, confidence);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6A11CB), foregroundColor: Colors.white),
+            child: const Text("Les deux"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveToCloudHistory(File imageFile, String label, double confidence) async {
+    try {
+      await HistoryService().saveDetection(
+        imageFile: imageFile,
+        label: label,
+        confidence: confidence,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("✅ Sauvegardé dans votre historique Cloud !"), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      debugPrint("Erreur history: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+           SnackBar(content: Text("Erreur sauvegarde Cloud: $e"), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _shareToCommunity(File imageFile, String label, double confidence) async {
+    try {
+      await SharingService().shareDetection(
+        imageFile: imageFile,
+        label: label,
+        confidence: confidence,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("✅ Partagé avec la communauté !"), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      debugPrint("Erreur share: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+           SnackBar(content: Text("Erreur partage: $e"), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   @override
@@ -226,9 +319,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                           clipBehavior: Clip.hardEdge,
                           child: LayoutBuilder(
                             builder: (context, constraints) {
-                              // 3. LOGIQUE D'AFFICHAGE INTELLIGENTE
-                              // Si on a fait l'analyse, on affiche l'image corrigée (bytes).
-                              // Sinon, on affiche le fichier brut (File).
+                              // LOGIQUE D'AFFICHAGE INTELLIGENTE
                               final bool hasAnalysis = _correctedImageBytes != null && _correctedImageSize != null;
                               
                               return FittedBox(
