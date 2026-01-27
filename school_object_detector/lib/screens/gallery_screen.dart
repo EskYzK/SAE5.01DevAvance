@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
-import 'object_detection_service.dart';
+import '../service/object_detection_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image/image.dart' as img; 
 import 'package:path_provider/path_provider.dart';
