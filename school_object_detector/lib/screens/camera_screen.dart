@@ -8,7 +8,8 @@ import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image/image.dart' as img;
 import '../service/sharing_service.dart';
-import '../service/history_service.dart'; // Assurez-vous d'avoir cet import
+import '../service/history_service.dart';
+import './history_screen.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -216,7 +217,6 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
     }
   }
 
-  // --- NOUVELLE VERSION DE LA BOITE DE DIALOGUE (Style Classique) ---
   Future<void> _askToShare(File imageFile, List<Map<String, dynamic>> detections) async {
     if (!mounted) return;
 
@@ -387,6 +387,28 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
                     : const Icon(Icons.camera_alt, size: 36),
                 ),
               ),
+            ),
+          ),
+
+          Positioned(
+            bottom: 112,
+            right: 40, 
+            child: FloatingActionButton(
+              heroTag: 'GoToHistory',
+              backgroundColor: Colors.white,
+              foregroundColor: const Color(0xFF6A11CB),
+              onPressed: () {
+                _isBusy = true; 
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const HistoryScreen()),
+                ).then((_) {
+                  if (mounted) {
+                    setState(() => _isBusy = false);
+                  }
+                });
+              },
+              child: const Icon(Icons.history, size: 28),
             ),
           ),
         ],
