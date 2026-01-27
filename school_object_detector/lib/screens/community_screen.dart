@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../widgets/full_screen_image_viewer.dart'; // Import du widget de zoom
 
 class CommunityScreen extends StatelessWidget {
   const CommunityScreen({super.key});
@@ -7,55 +8,143 @@ class CommunityScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Communauté")),
+      appBar: AppBar(
+        title: const Text("Communauté"),
+        backgroundColor: const Color(0xFF6A11CB),
+        foregroundColor: Colors.white,
+      ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('detections')
             .orderBy('timestamp', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.hasError) return const Center(child: Text("Erreur"));
+          if (snapshot.hasError) {
+            return const Center(child: Text("Oups, une erreur est survenue."));
+          }
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
+          
           final docs = snapshot.data!.docs;
-          if (docs.isEmpty) return const Center(child: Text("Aucun partage."));
+          if (docs.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.public_off, size: 60, color: Colors.grey),
+                  SizedBox(height: 10),
+                  Text("Aucun partage pour le moment."),
+                ],
+              ),
+            );
+          }
 
           return ListView.builder(
+            padding: const EdgeInsets.only(top: 10, bottom: 20),
             itemCount: docs.length,
             itemBuilder: (context, index) {
               final data = docs[index].data() as Map<String, dynamic>;
               
+              // Récupération sécurisée des données
+              final String? imageUrl = data['imageUrl'];
+              final String label = data['label'] ?? 'Objet inconnu';
+              final double confidence = (data['confidence'] ?? 0.0).toDouble();
+              final String userPseudo = data['userPseudo'] ?? 'Anonyme';
+              final String docId = docs[index].id;
+
               return Card(
-                margin: const EdgeInsets.all(10),
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                elevation: 3,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                clipBehavior: Clip.antiAlias, // Pour que l'image respecte les bords arrondis
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // 1. EN-TÊTE (Utilisateur)
                     ListTile(
-                      leading: CircleAvatar(child: Icon(Icons.person)),
-                      title: Text(data['userPseudo'] ?? 'Utilisateur inconnu'),
-                      trailing: Text(
-                        "Posté récemment", 
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.blueAccent.withOpacity(0.2),
+                        child: Text(
+                          userPseudo.isNotEmpty ? userPseudo[0].toUpperCase() : "?",
+                          style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold),
+                        ),
                       ),
+                      title: Text(userPseudo, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      trailing: const Icon(Icons.public, size: 16, color: Colors.grey),
                     ),
-                    if (data['imageUrl'] != null)
-                      Image.network(
-                        data['imageUrl'],
-                        height: 200,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
+
+                    // 2. IMAGE (Cliquable pour zoom)
+                    if (imageUrl != null && imageUrl.isNotEmpty)
+                      GestureDetector(
+                        onTap: () {
+                          // Navigation vers le mode plein écran corrigé
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => FullScreenImageViewer(
+                                imagePath: imageUrl, // On passe l'URL ici
+                                heroTag: 'community_$docId',
+                              ),
+                            ),
+                          );
+                        },
+                        child: Hero(
+                          tag: 'community_$docId',
+                          child: SizedBox(
+                            height: 250,
+                            width: double.infinity,
+                            child: Image.network(
+                              imageUrl,
+                              fit: BoxFit.cover,
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return Center(
+                                  child: CircularProgressIndicator(
+                                    value: loadingProgress.expectedTotalBytes != null
+                                        ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                        : null,
+                                  ),
+                                );
+                              },
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  height: 250,
+                                  color: Colors.grey[200],
+                                  child: const Center(
+                                    child: Icon(Icons.broken_image, size: 50, color: Colors.grey),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
                       ),
+
+                    // 3. INFORMATIONS (Label & Confiance)
                     Padding(
                       padding: const EdgeInsets.all(12.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            data['label'] ?? 'Inconnu',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                label,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "Confiance IA : ${(confidence * 100).toStringAsFixed(1)}%",
+                                style: TextStyle(
+                                  color: confidence > 0.8 ? Colors.green : Colors.orange,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
                           ),
-                          Text("Confiance : ${((data['confidence'] ?? 0) * 100).toStringAsFixed(1)}%"),
                         ],
                       ),
                     ),
