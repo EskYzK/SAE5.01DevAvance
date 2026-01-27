@@ -51,13 +51,14 @@ class CommunityScreen extends StatelessWidget {
               final String label = data['label'] ?? 'Objet inconnu';
               final double confidence = (data['confidence'] ?? 0.0).toDouble();
               final String userPseudo = data['userPseudo'] ?? 'Anonyme';
+              final String? userPhotoUrl = data['userPhotoUrl'];
               final String docId = docs[index].id;
 
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 elevation: 3,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                clipBehavior: Clip.antiAlias, // Pour que l'image respecte les bords arrondis
+                clipBehavior: Clip.antiAlias,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -65,25 +66,28 @@ class CommunityScreen extends StatelessWidget {
                     ListTile(
                       leading: CircleAvatar(
                         backgroundColor: Colors.blueAccent.withOpacity(0.2),
-                        child: Text(
-                          userPseudo.isNotEmpty ? userPseudo[0].toUpperCase() : "?",
-                          style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold),
-                        ),
+                        backgroundImage: (userPhotoUrl != null && userPhotoUrl.isNotEmpty) 
+                            ? NetworkImage(userPhotoUrl) 
+                            : null,
+                          child: (userPhotoUrl == null || userPhotoUrl.isEmpty) 
+                            ? Text(
+                                userPseudo.isNotEmpty ? userPseudo[0].toUpperCase() : "?",
+                                style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold),
+                              )
+                            : null,
                       ),
                       title: Text(userPseudo, style: const TextStyle(fontWeight: FontWeight.bold)),
                       trailing: const Icon(Icons.public, size: 16, color: Colors.grey),
                     ),
 
-                    // 2. IMAGE (Cliquable pour zoom)
                     if (imageUrl != null && imageUrl.isNotEmpty)
                       GestureDetector(
                         onTap: () {
-                          // Navigation vers le mode plein écran corrigé
                           Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) => FullScreenImageViewer(
-                                imagePath: imageUrl, // On passe l'URL ici
+                                imagePath: imageUrl,
                                 heroTag: 'community_$docId',
                               ),
                             ),
@@ -121,7 +125,6 @@ class CommunityScreen extends StatelessWidget {
                         ),
                       ),
 
-                    // 3. INFORMATIONS (Label & Confiance)
                     Padding(
                       padding: const EdgeInsets.all(12.0),
                       child: Row(

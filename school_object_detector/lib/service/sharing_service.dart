@@ -57,6 +57,7 @@ class SharingService {
         'timestamp': FieldValue.serverTimestamp(),
         'userId': user.uid,
         'userPseudo': pseudo,
+        'userPhotoUrl': user.photoURL,
       });
       
       
