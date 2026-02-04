@@ -1,36 +1,47 @@
 # 🔄 Procédure de Ré-entraînement et Mise à Jour de l'IA
 
-Ce document décrit le protocole complet pour améliorer les performances du modèle de détection d'objets (YOLOv8) via l'application mobile et un serveur de calcul (Kaggle).
+Ce document décrit le protocole complet pour améliorer les performances du modèle de détection d'objets (YOLOv8) via la collecte communautaire Firebase et un serveur de calcul (Kaggle).
 
 
 ## 📋 Prérequis
 
 1. **Mobile :** Application installée.
 2. **PC :**
-* Une archive nommée **`base.zip`** contenant l'historique (Modèle `.pt` + Dossiers `train`/`valid`). Elle se trouve dans les Releases du Git.
-* Accès à **Kaggle** avec GPU activé (T4 x2 recommandé).
-3. **Connexion :** Google Drive pour le transfert de fichiers.
+    * Le script Python **`downloadAnnotatedPictures.py`** configuré avec sa clé **`serviceAccountKey.json`** dans le même dossier.
+        - La clé `serviceAccountKey.json` peut être obtenue dans les **paramètres de votre projet Firebase** > **Comptes de service** > **SDK Admin Firebase** > **Générer une nouvelle clé privée**.
+    * Une archive nommée **`base.zip`** contenant l'historique (Modèle `.pt` + Dossiers `train`/`valid`). Elle se trouve dans les Releases du Git.
+    * Accès à **Kaggle** avec GPU activé (T4 x2 recommandé).
+3. **Connexion :** Accès à la **console Firebase** du projet pour la gestion du Storage (dossiers `annotated_pictures` et `models`, accès aux paramètres du projet afin de pouvoir récupérer la clé `serviceAccountKey.json`).
 
 
 ## 1️⃣ Phase de Collecte (Sur le Téléphone) 📸
 
-L'objectif est de capturer des images d'un objet mal détecté pour enrichir le dataset.
+L'objectif est de capturer des images d'objets scolaires mal détectés pour enrichir le dataset communautaire.
 
-1. Ouvrir l'application **School Object Detector**.
+1. Ouvrir l'application **Scolarize**.
 2. Aller dans **Plus d'options** > **Collecte de données**.
 3. **Sélectionner la classe** de l'objet à améliorer (ex: `ruler`, `pen`).
 4. **Placer l'objet** dans le viseur vert (Overlay).
-5. Prendre **10 à 15 photos** environ en variant légèrement :
-* L'angle de vue.
-* La rotation de l'objet.
-6. Cliquer sur le bouton **📦 ZIP**.
-7. Enregistrer le fichier **`new_data.zip`** sur votre **Google Drive (Mon Drive)**.
+5. Prendre **10 à 20 photos** environ en variant légèrement :
+    * L'angle de vue.
+    * La rotation de l'objet.
+6. Cliquer sur le bouton **Exporter** :
+    * L'application envoie les images et leur annotation YOLO vers le dossier `annotated_pictures` de Firebase Storage.
+    * *Note : Les fichiers locaux sont automatiquement supprimés après l'envoi pour libérer de l'espace sur le téléphone.*
 
 
-## 2️⃣ Phase de Transfert (Mobile vers PC) 📲
+## 2️⃣ Phase de Centralisation (Sur PC) 📲
 
-1. Récupérer le fichier `new_data.zip` avec votre ordinateur depuis votre Google Drive.
-2. Le placer sur le Bureau du PC à côté de l'archive `base.zip`.
+1. Sur votre ordinateur, ouvrir un terminal dans le dossier `Ré-entrainement`, contenant le script `downloadAnnotatedPictures.py` et votre clé `serviceAccountKey.json`.
+2. Lancer le script de téléchargement avec la commande :
+```
+python downloadAnnotatedPictures.py
+```
+3. Actions du script :
+    - Il télécharge toutes les nouvelles photos et annotations depuis Firebase.
+    - Il crée une archive nommée `new_data.zip` sur votre PC, dans le dossier `Ré-entrainement`.
+    - Il vide automatiquement le dossier `annotated_pictures` sur Firebase pour éviter les doublons lors du prochain ré-entraînement.
+4. Vérifier que `new_data.zip` soit bien sur votre PC, dans le même dossier que l'archive `base.zip`.
 
 
 ## 3️⃣ Phase d'Entraînement (Sur Kaggle) 🧠
@@ -38,14 +49,15 @@ L'objectif est de capturer des images d'un objet mal détecté pour enrichir le 
 1. Aller sur Kaggle, ajouter un numéro de téléphone et le vérifier (nécessaire pour accéder aux GPU T4).
 2. Ouvrir un nouveau Notebook Kaggle.
 3. Dans la section **Input** (colonne de droite), cliquer sur **Upload** > **New Dataset**, et uploader les deux fichiers :
-* `base.zip` (La mémoire à long terme).
-* `new_data.zip` (Les nouvelles données fraîches).
+    * `base.zip` (L'historique de toutes les sessions précédentes).
+    * `new_data.zip` (Les nouvelles données issues de la collecte communautaire, et récupérées par votre script Python).
 4. Nommer ce dataset : `dataset-X`, où X est le numéro que vous souhaitez donner à votre dataset. Si c'est le premier ré-entrainement que vous faites, vous pouvez le nommer `dataset-1`.
 5. Créer ce dataset.
 6. En haut à gauche, aller dans **Settings** > **Accelerator** > **GPU T4 x2** ⚠️.
-7. Lancer le **Script d'Entraînement Automatique**.
-* *Le script va fusionner les datasets, configurer YOLO, et lancer le ré-entrainement sur 30 epochs.*
-* *Vous pourrez ensuite récupérer le nouveau modèle ainsi que la nouvelle base de ré-entrainement.*
+7. Dans le script ci-dessous, ajuster les constantes `PATH_DIR_BASE` et `PATH_DIR_MOBILE` (si c'est votre second ré-entrainement, il faut alors que les variables valent respectivement `'/kaggle/input/dataset-2/new_base'`, et `'/kaggle/input/dataset-2/new_data'`).  
+8. Copier et coller le **Script d'Entraînement Automatique** ci-dessous dans une cellule, et le lancer.
+    * *Le script va fusionner les datasets, configurer YOLO, et lancer le ré-entrainement sur 150 epochs, avec une patience de 50 epochs.*
+    * *Vous pourrez ensuite récupérer le nouveau modèle ainsi que la nouvelle base de ré-entrainement.*
 ```
 # ==============================================================================
 # 🛠️ INSTALLATION DES DÉPENDANCES
@@ -72,13 +84,14 @@ CLASSES = [
 ]
 
 HYPER_PARAMS = {
-    'epochs': 30,
+    'epochs': 150,
     'imgsz': 960,
     'batch': 16,
     'mosaic': 1.0,
     'lr0': 0.0001,
     'lrf': 0.01,
-    'verbose': True
+    'verbose': True,
+    'patience': 50
 }
 # ==============================================================================
 
@@ -162,7 +175,7 @@ def run_training_cycle():
     with open(f'{work_dir}/data.yaml', 'w') as f:
         yaml.dump(yaml_content, f)
 
-    print(f"🧠 Entraînement sur {HYPER_PARAMS['epochs']} epochs...")
+    print(f"🧠 Entraînement sur {HYPER_PARAMS['epochs']} epochs, avec une patience de {HYPER_PARAMS['patience']}...")
     model = YOLO(model_path)
     model.train(data=f'{work_dir}/data.yaml', project=work_dir, name='run_cycle', **HYPER_PARAMS)
     
@@ -207,25 +220,33 @@ if __name__ == '__main__':
 ```
 
 
-8. Attendre la fin de l'exécution (~135 minutes).
-9. Dans la section **Output**, recharger le dossier `/kaggle/working`, et télécharger les deux fichiers générés :
+9. Attendre la fin de l'exécution (~675 minutes, ne pas fermer la page Kaggle, vérifier que l'ordinateur est bien branché sur secteur, possède une connexion internet fiable, et dans les options de "délai d'expiration de l'écran, de la veille, et de la mise en veille prolongée", que les paramètres "Désactiver l'écran" et "Mettre mon appareil en veille après" soient définis sur "Jamais").
+10. Dans la section **Output**, recharger le dossier `/kaggle/working`, et télécharger les deux fichiers générés :
 * 📄 **`updated_model.tflite`** : Le modèle optimisé pour Android.
 * 📄 **`new_base.zip`** : Le nouveau fichier de base (pour la prochaine fois).
 
 
-## 4️⃣ Phase de Déploiement (PC vers Mobile) 🚀
+## 4️⃣ Phase de Déploiement (Admin vers Firebase) 🚀
+L'objectif est de mettre à disposition le nouveau modèle pour tous les utilisateurs de l'application.
 
-1. Transférer le fichier **`updated_model.tflite`** vers votre **Google Drive (Mon Drive)**.
-2. Ouvrir l'application mobile.
-3. Aller dans le **Plus d'options** > **Importer modèle**.
-4. Sélectionner le fichier `updated_model.tflite` depuis votre Google Drive.
-5. Attendre la confirmation : *"✅ Cerveau mis à jour !"*.
-6. Redémarrer l'application.
+1. Sur la Console Firebase :
+    * Accéder à la section **Storage** > **dossier `models`**.
+    * *Conseil : Renommer le fichier de manière explicite (ex: model_2026_02_20.tflite) pour que les utilisateurs puissent l'identifier facilement.*
+    * Importer le fichier `updated_model.tflite` généré par Kaggle.
+2. Sur l'Application Mobile :
+    * Ouvrir l'application Scolarize.
+    * Aller dans **Plus d'options** > **Importer un modèle**.
+    * Sélectionner le nouveau modèle dans la liste récupérée depuis Firebase.
+    * Attendre le message de confirmation.
+3. Redémarrer l'application pour activer la nouvelle version de l'IA.
 
 
 ## 5️⃣ Prochaine fois ⌚
 
-*Cette étape est cruciale pour ne pas perdre l'apprentissage lors de la prochaine session.*
+*Cette étape est cruciale pour ne pas perdre l'apprentissage lors de la prochaine session de ré-entrainement.*
 
-1. Au lieu d'utiliser `base.zip` pour le ré-entrainement, il faudra utiliser `new_base.zip`.
-2. Le système est prêt pour le prochain cycle.
+1. Sauvegarde de la base : Le fichier `new_base.zip` téléchargé depuis Kaggle contient désormais l'intégralité du dataset (Ancien + Nouveau) ainsi que le dernier modèle `.pt`.
+2. Cycle suivant : 
+    * Utiliser `new_base.zip` à la place de l'ancien `base.zip` pour le ré-entrainement.
+    * Récupérer les nouvelles photos avec le script `downloadAnnotatedPictures.py` pour créer un nouveau `new_data.zip`.
+3. Le système est prêt pour une amélioration continue et collaborative !

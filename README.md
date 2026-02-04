@@ -6,7 +6,7 @@
 
 Ce projet a été réalisé dans le cadre de la **SAE 5.01 - Développement Avancé**. L'objectif est de développer une application mobile capable de détecter, identifier et classer des objets du monde réel (ici, du matériel scolaire) en temps réel via la caméra du smartphone.
 
-La particularité de cette application est son cycle d'**Apprentissage Actif (Active Learning)** : les utilisateurs peuvent capturer des images d'objets mal détectés pour ré-entraîner l'IA et améliorer ses performances au fil du temps.
+La particularité de cette application est son cycle d'**Apprentissage Actif (Active Learning)** : les utilisateurs peuvent capturer des images d'objets scolaires mal détectés pour ré-entraîner l'IA et améliorer ses performances au fil du temps.
 
 ### 👥 L'Équipe
 
@@ -24,7 +24,6 @@ La particularité de cette application est son cycle d'**Apprentissage Actif (Ac
 * **📸 Collecte de Données :** Interface dédiée pour prendre des photos d'objets spécifiques, générer des datasets et les exporter (ZIP) pour l'amélioration du modèle.
 * **🧠 Mise à jour du Modèle :** Possibilité d'importer un nouveau modèle `.tflite` mis à jour directement depuis l'application sans réinstallation.
 * **☁️ Cloud & Historique :** Intégration avec Firebase pour le stockage et historique des détections.
-* **📤 Partage :** Export facile des datasets vers Google Drive ou par email.
 
 
 ## 🛠️ Stack Technique
@@ -77,32 +76,35 @@ flutter run
 
 ## 🔄 Cycle de Ré-entraînement (Active Learning)
 
-Ce projet inclut une procédure complète pour permettre à l'utilisateur d'améliorer l'IA. Voir le guide complet ici : [📄 Procédure de Ré-entraînement](R%C3%A9-entrainement/Proc%C3%A9dure.md).
+Ce projet repose sur un système de **Crowdsourcing** et d'**Active Learning** : chaque utilisateur peut contribuer à l'intelligence collective de l'application en fournissant des données sur les objets mal détectés. Voir le guide complet ici : [📄 Procédure de Ré-entraînement](R%C3%A9-entrainement/Proc%C3%A9dure.md).
 
 **En résumé :**
 
-1. **Collecte :** Dans l'app, menu "Collecte de données" > Prendre des photos > Exporter le ZIP.
-2. **Entraînement :** Sur Kaggle, uploader le `base.zip` (historique) + `new_data.zip` (nouvelles photos) et lancer le script fourni.
-3. **Déploiement :** Récupérer le `updated_model.tflite` généré et l'importer dans l'application via le menu "Importer modèle".
+1. **Collecte :** Dans l'app, menu "Collecte de données" > Prendre des photos > Exporter. Les données sont envoyées instantanément sur Firebase Storage.
+2. **Centralisation :** L'administrateur utilise le script Python `downloadAnnotatedPictures.py` pour récupérer toutes les contributions du mois et générer un fichier `new_data.zip`.
+3. **Entraînement :** Sur Kaggle, uploader le `base.zip` (historique) + `new_data.zip` (nouvelles photos) et lancer le script d'entrainement fourni.
+4. **Déploiement :** Récupérer le `updated_model.tflite` généré et l'importer sur Firebase. Les utilisateurs n'ont plus qu'à cliquer sur "Importer un modèle" dans l'application pour mettre à jour leur IA.
 
 
 ## 📂 Architecture du Projet
 
 ```
 SAE5.01DevAvance/
-├── Comptes-rendus/          # Suivi de projet (PDF)
-├── Ré-entrainement/         # Scripts et documentation IA
-│   └── Procédure.md         # Tutoriel de mise à jour du modèle
-├── school_object_detector/  # Code source de l'application Flutter
-│   ├── android/             # Configuration native Android
+├── Comptes-rendus/                     # Suivi de projet (PDF)
+├── Ré-entrainement/                    # Scripts et documentation IA
+│   ├── downloadAnnotatedPictures.py    # Script de téléchargement des nouvelles images d'entrainement
+│   └── Procédure.md                    # Tutoriel de mise à jour du modèle
+├── school_object_detector/             # Code source de l'application Flutter
+│   ├── android/                        # Configuration native Android
 │   ├── assets/
-│   │   └── ml/              # Modèles TFLite et labels
+│   │   ├── icons/                      # Icônes
+│   │   └── ml/                         # Modèles TFLite et labels
 │   ├── lib/
-│   │   ├── screens/         # Écrans (Camera, Home, Collection...)
-│   │   ├── service/         # Services (Partage, Détection...)
-│   │   └── main.dart        # Point d'entrée
-│   └── pubspec.yaml         # Dépendances
-└── README.md                # Ce fichier
+│   │   ├── screens/                    # Écrans (Camera, Home, Collection...)
+│   │   ├── service/                    # Services (Partage, Détection...)
+│   │   └── main.dart                   # Point d'entrée
+│   └── pubspec.yaml                    # Dépendances
+└── README.md                           # Ce fichier
 ```
 
 
