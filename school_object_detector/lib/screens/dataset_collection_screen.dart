@@ -2,9 +2,8 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:archive/archive_io.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:permission_handler/permission_handler.dart'; // Ajout pour la cohérence
+import '../service/sharing_service.dart';
 
 class DatasetCollectionScreen extends StatefulWidget {
   // Plus besoin de passer les caméras en paramètre !
@@ -19,6 +18,8 @@ class _DatasetCollectionScreenState extends State<DatasetCollectionScreen> {
   List<CameraDescription> _cameras = []; // Stockage interne
   bool _isBusy = false;
   int _photoCount = 0;
+  
+  final SharingService _sharingService = SharingService();
   
   // Tes classes exactes (labels.txt)
   final List<String> _classes = [
@@ -169,9 +170,6 @@ class _DatasetCollectionScreenState extends State<DatasetCollectionScreen> {
     }
   }
 
-  // ... (Le reste des fonctions _captureAndAnnotate et _exportDataset reste IDENTIQUE à ma version précédente)
-  // Je les remets ici pour que tu aies un copier-coller complet
-
   Future<void> _captureAndAnnotate() async {
     if (_controller == null || !_controller!.value.isInitialized || _isBusy) return;
     setState(() => _isBusy = true);
@@ -219,39 +217,52 @@ class _DatasetCollectionScreenState extends State<DatasetCollectionScreen> {
     }
   }
 
-  Future<void> _exportDataset() async {
+  Future<void> _syncDatasetToFirebase() async {
     setState(() => _isBusy = true);
     try {
       final directory = await getApplicationDocumentsDirectory();
-      final zipEncoder = ZipFileEncoder();
-      final zipPath = '${directory.path}/new_data.zip';
-
-      final zipFile = File(zipPath);
-      if (await zipFile.exists()) await zipFile.delete();
-
-      zipEncoder.create(zipPath);
       final List<FileSystemEntity> files = directory.listSync();
-      int countAdded = 0;
+      
+      // On filtre les images qui n'ont pas encore été envoyées
+      final imageFiles = files.where((f) => f.path.contains('train_') && f.path.endsWith('.jpg')).toList();
 
-      for (var file in files) {
-        final filename = file.path.split('/').last;
-        if (filename.startsWith('train_') && 
-           (filename.endsWith('.jpg') || filename.endsWith('.txt'))) {
-          zipEncoder.addFile(File(file.path));
-          countAdded++;
-        }
-      }
-      zipEncoder.close();
-
-      if (countAdded == 0) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Rien à exporter !")));
-        setState(() => _isBusy = false);
+      if (imageFiles.isEmpty) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Rien à synchroniser !")));
         return;
       }
 
-      await Share.shareXFiles([XFile(zipPath)], text: 'Dataset SAE');
+      int successCount = 0;
+      for (var entity in imageFiles) {
+        File imgFile = File(entity.path);
+        File txtFile = File(entity.path.replaceAll('.jpg', '.txt'));
+
+        if (await txtFile.exists()) {
+          // Extraction du label depuis le nom du fichier
+          final name = entity.path.split('/').last;
+          final parts = name.split('_');
+          String label = parts.length >= 3 ? parts.sublist(2).join('_').replaceAll('.jpg', '') : "unknown";
+
+          await _sharingService.uploadToDataset(
+            imageFile: imgFile,
+            annotationFile: txtFile,
+            label: label,
+          );
+          
+          // Suppression locale après upload pour nettoyer
+          await imgFile.delete();
+          await txtFile.delete();
+          successCount++;
+        }
+      }
+
+      await _countExistingPhotos(); // Rafraîchir le compteur à 0
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("🚀 $successCount photos envoyées à la communauté !"), backgroundColor: Colors.blue)
+        );
+      }
     } catch (e) {
-      debugPrint("Erreur export: $e");
+      debugPrint("Erreur sync: $e");
     } finally {
       setState(() => _isBusy = false);
     }
@@ -357,11 +368,11 @@ class _DatasetCollectionScreenState extends State<DatasetCollectionScreen> {
                     Expanded(
                       flex: 1,
                       child: ElevatedButton.icon(
-                        onPressed: (_photoCount > 0 && !_isBusy) ? _exportDataset : null,
-                        icon: const Icon(Icons.archive),
-                        label: const Text("ZIP"),
+                        onPressed: (_photoCount > 0 && !_isBusy) ? _syncDatasetToFirebase : null,
+                        icon: const Icon(Icons.cloud_upload),
+                        label: const Text("Exporter"),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
+                          backgroundColor: Colors.blueAccent,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 15),
                         ),

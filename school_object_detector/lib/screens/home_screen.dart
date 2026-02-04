@@ -1,41 +1,82 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
-import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 // import 'package:firebase_auth/firebase_auth.dart'; // Optionnel si vous voulez changer l'icône selon l'état
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
-  // ... (Garder la fonction _importNewModel inchangée) ...
-  static Future<void> _importNewModel(BuildContext context) async {
-    // ... (votre code existant pour _importNewModel)
-    try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['tflite'],
-      );
+  static Future<void> _downloadModel(BuildContext context, Reference modelRef) async {
+  try {
+    // Afficher un indicateur de chargement
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Téléchargement du nouveau cerveau..."), duration: Duration(seconds: 2))
+    );
 
-      if (result != null && result.files.single.path != null) {
-        File sourceFile = File(result.files.single.path!);
-        final directory = await getApplicationDocumentsDirectory();
-        final String newPath = '${directory.path}/updated_model.tflite';
-        final File targetFile = File(newPath);
-        if (await targetFile.exists()) {
-          await targetFile.delete();
-        }
-        await sourceFile.copy(newPath);
+    final directory = await getApplicationDocumentsDirectory();
+    final File targetFile = File('${directory.path}/updated_model.tflite');
+
+    // Téléchargement direct vers le fichier local utilisé par ObjectDetectionService
+    await modelRef.writeToFile(targetFile);
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("✅ Cerveau mis à jour ! Redémarrez l'application."),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  } catch (e) {
+    debugPrint("Erreur téléchargement: $e");
+  }
+}
+
+  static Future<void> _importNewModel(BuildContext context) async {
+    try {
+      // 1. Lister les fichiers dans le dossier "models" de Firebase Storage
+      final storageRef = FirebaseStorage.instance.ref().child("models");
+      final listResult = await storageRef.listAll();
+
+      if (listResult.items.isEmpty) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("✅ Cerveau mis à jour ! Redémarrez l'application."),
-              backgroundColor: Colors.green,
-            ),
+            const SnackBar(content: Text("Aucun nouveau modèle disponible pour le moment."))
           );
         }
+        return;
+      }
+
+      // 2. Afficher une boîte de dialogue de sélection
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text("Choisir un modèle"),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: listResult.items.length,
+                itemBuilder: (c, i) {
+                  final item = listResult.items[i];
+                  return ListTile(
+                    leading: const Icon(Icons.psychology, color: Color(0xFF6A11CB)),
+                    title: Text(item.name),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      await _downloadModel(context, item);
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        );
       }
     } catch (e) {
-      debugPrint("Erreur import: $e");
+      debugPrint("Erreur liste modèles: $e");
     }
   }
 
