@@ -11,6 +11,8 @@ import '../service/sharing_service.dart';
 import '../service/history_service.dart';
 import './history_screen.dart';
 import '../widgets/object_painter.dart';
+import 'dart:ui' as ui;
+import 'dart:typed_data';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -131,6 +133,32 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
     if (mounted) setState(() => _isBusy = false);
   }
 
+  Future<Uint8List> _applyPainterToImage(Uint8List imageBytes, List<Map<String, dynamic>> detections) async {
+    final ui.Codec codec = await ui.instantiateImageCodec(imageBytes);
+    final ui.FrameInfo frameInfo = await codec.getNextFrame();
+    final ui.Image image = frameInfo.image;
+    
+    final size = Size(image.width.toDouble(), image.height.toDouble());
+    final ui.PictureRecorder recorder = ui.PictureRecorder();
+    final Canvas canvas = Canvas(recorder);
+
+    canvas.drawImage(image, Offset.zero, Paint());
+
+    // On utilise ObjectPainter pour dessiner les jolis cadres
+    final objectPainter = ObjectPainter(
+      detections, 
+      size, 
+      CameraLensDirection.back // Toujours 'back' ici pour ne pas inverser le dessin sur la photo figée
+    );
+    objectPainter.paint(canvas, size);
+
+    final ui.Picture picture = recorder.endRecording();
+    final ui.Image annotatedImage = await picture.toImage(image.width, image.height);
+    final ByteData? byteData = await annotatedImage.toByteData(format: ui.ImageByteFormat.png);
+    
+    return byteData!.buffer.asUint8List();
+  }
+
   Future<void> _takePictureAndAnalyze() async {
     if (_controller == null || !_controller!.value.isInitialized || _isCapturing) return;
 
@@ -155,53 +183,14 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
         );
 
         if (detections.isNotEmpty) {
-          for (var detection in detections) {
-            final box = detection["box"];
-            
-            final x1 = (box[0] as double).toInt();
-            final y1 = (box[1] as double).toInt();
-            final x2 = (box[2] as double).toInt();
-            final y2 = (box[3] as double).toInt();
-            
-            img.drawRect(
-              fixedImage, 
-              x1: x1, y1: y1, x2: x2, y2: y2, 
-              color: img.ColorRgb8(255, 0, 0), 
-              thickness: 3
-            );
-
-            final label = "${detection['tag']} ${(box[4] * 100).toStringAsFixed(0)}%";
-
-            int textWidth = label.length * 14 + 12; 
-            int textHeight = 30;
-            
-            int textY = y1 - textHeight;
-            if (textY < 0) textY = y1 + 4;
-            
-            img.fillRect(
-              fixedImage, 
-              x1: x1, 
-              y1: textY, 
-              x2: x1 + textWidth, 
-              y2: textY + textHeight, 
-              color: img.ColorRgb8(0, 0, 0)
-            );
-
-            img.drawString(
-              fixedImage, 
-              label, 
-              font: img.arial24, 
-              x: x1 + 6, 
-              y: textY + 3, 
-              color: img.ColorRgb8(255, 255, 255)
-            );
-          }
+          final annotatedBytes = await _applyPainterToImage(fixedBytes, detections);
 
           final directory = await getApplicationDocumentsDirectory();
-          final fileName = 'capture_${DateTime.now().millisecondsSinceEpoch}.jpg';
+          final fileName = 'capture_${DateTime.now().millisecondsSinceEpoch}.png';
           final savedPath = p.join(directory.path, fileName);
           
-          await File(savedPath).writeAsBytes(img.encodeJpg(fixedImage, quality: 80));
+          final fileSaved = File(savedPath);
+          await fileSaved.writeAsBytes(annotatedBytes);
           
           final prefs = await SharedPreferences.getInstance();
           List<String> history = prefs.getStringList('history_images') ?? [];
@@ -209,7 +198,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
           await prefs.setStringList('history_images', history);
 
           if (mounted) {
-            _askToShare(File(savedPath), detections);
+            _askToShare(fileSaved, detections);
           }
         } else {
           if (mounted) {

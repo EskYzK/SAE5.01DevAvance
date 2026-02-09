@@ -10,6 +10,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../service/sharing_service.dart';
 import '../service/history_service.dart';
+import 'dart:ui' as ui;
+import '../widgets/object_painter.dart';
+import 'package:camera/camera.dart';
 
 class GalleryScreen extends StatefulWidget {
   const GalleryScreen({super.key});
@@ -49,6 +52,34 @@ class _GalleryScreenState extends State<GalleryScreen> {
     }
   }
 
+  Future<Uint8List> _applyPainterToImage(Uint8List imageBytes, List<Map<String, dynamic>> detections) async {
+    final ui.Codec codec = await ui.instantiateImageCodec(imageBytes);
+    final ui.FrameInfo frameInfo = await codec.getNextFrame();
+    final ui.Image image = frameInfo.image;
+    
+    final size = Size(image.width.toDouble(), image.height.toDouble());
+
+    final ui.PictureRecorder recorder = ui.PictureRecorder();
+    final Canvas canvas = Canvas(recorder);
+
+    canvas.drawImage(image, Offset.zero, Paint());
+
+    // Utilise exactement le même Painter que la caméra
+    final objectPainter = ObjectPainter(
+      detections, 
+      size, 
+      CameraLensDirection.back 
+    );
+    objectPainter.paint(canvas, size);
+
+    final ui.Picture picture = recorder.endRecording();
+    final ui.Image annotatedImage = await picture.toImage(image.width, image.height);
+    
+    final ByteData? byteData = await annotatedImage.toByteData(format: ui.ImageByteFormat.png);
+    
+    return byteData!.buffer.asUint8List();
+  }
+
   Future<void> _analyzeImage() async {
     if (_selectedImage == null) return;
 
@@ -72,61 +103,18 @@ class _GalleryScreenState extends State<GalleryScreen> {
           fixedImage.height
         );
 
-        for (var detection in detections) {
-          final box = detection["box"];
-          
-          final x1 = (box[0] as double).toInt();
-          final y1 = (box[1] as double).toInt();
-          final x2 = (box[2] as double).toInt();
-          final y2 = (box[3] as double).toInt();
-          
-          img.drawRect(
-            fixedImage, 
-            x1: x1, y1: y1, x2: x2, y2: y2, 
-            color: img.ColorRgb8(255, 0, 0), 
-            thickness: 3
-          );
-
-          final label = "${detection['tag']} ${(box[4] * 100).toStringAsFixed(0)}%";
-
-          int textWidth = label.length * 14 + 12; 
-          int textHeight = 30;
-          
-          int textY = y1 - textHeight;
-          if (textY < 0) textY = y1 + 4;
-          
-
-          img.fillRect(
-            fixedImage, 
-            x1: x1, 
-            y1: textY, 
-            x2: x1 + textWidth, 
-            y2: textY + textHeight, 
-            color: img.ColorRgb8(0, 0, 0)
-          );
-
-          img.drawString(
-            fixedImage, 
-            label, 
-            font: img.arial24, 
-            x: x1 + 6, 
-            y: textY + 3, 
-            color: img.ColorRgb8(255, 255, 255)
-          );
-        }
+        final annotatedBytes = await _applyPainterToImage(fixedBytes, detections);
 
         final directory = await getApplicationDocumentsDirectory();
-        final fileName = 'analyse_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final fileName = 'analyse_${DateTime.now().millisecondsSinceEpoch}.png';
         final savedPath = p.join(directory.path, fileName);
-        
-        final finalBytes = img.encodeJpg(fixedImage);
         final fileSaved = File(savedPath);
-        await fileSaved.writeAsBytes(finalBytes);
+        await fileSaved.writeAsBytes(annotatedBytes);
 
         await _addToLocalHistory(savedPath);
 
         setState(() {
-          _correctedImageBytes = finalBytes; 
+          _correctedImageBytes = annotatedBytes; 
           _correctedImageSize = Size(fixedImage.width.toDouble(), fixedImage.height.toDouble());
           
           if (detections.isNotEmpty) {
