@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart'; // Ajout pour la cohérence
 import '../service/sharing_service.dart';
+import '../models/annotation.dart';
+import '../widgets/annotation_editor.dart';
 
 class DatasetCollectionScreen extends StatefulWidget {
-  // Plus besoin de passer les caméras en paramètre !
   const DatasetCollectionScreen({super.key});
 
   @override
@@ -18,15 +19,16 @@ class _DatasetCollectionScreenState extends State<DatasetCollectionScreen> {
   List<CameraDescription> _cameras = []; // Stockage interne
   bool _isBusy = false;
   int _photoCount = 0;
+  XFile? _tempImage;
+  DateTime? _lastFrameTime;
   
   final SharingService _sharingService = SharingService();
   
-  // Tes classes exactes (labels.txt)
+  // Les classes pour l'annotation
   final List<String> _classes = [
     'eraser', 'glue_stick', 'highlighter', 'pen', 'pencil', 
     'ruler', 'scissors', 'sharpener', 'stapler'
   ];
-  String _selectedClass = 'eraser';
 
   @override
   void initState() {
@@ -160,6 +162,26 @@ class _DatasetCollectionScreenState extends State<DatasetCollectionScreen> {
       );
 
       await controller.initialize();
+
+      // --- LIMITEUR D'IPS ---
+      await controller.startImageStream((image) {
+        final now = DateTime.now();
+        
+        // On définit ici la limite : 200 millisecondes = 5 images par seconde (FPS)
+        // Cela suffit largement pour garder le flux "actif" sans tuer l'émulateur.
+        if (_lastFrameTime != null && 
+            now.difference(_lastFrameTime!) < const Duration(milliseconds: 200)) {
+          // On ignore cette image (on retourne immédiatement)
+          return;
+        }
+        
+        _lastFrameTime = now;
+        
+        // (Ici, l'image est "consommée" mais on n'en fait rien sur cette page, 
+        // ce qui libère le buffer pour la suivante).
+      });
+      // -------------------------
+
       if (!mounted) return;
 
       setState(() {
@@ -170,50 +192,83 @@ class _DatasetCollectionScreenState extends State<DatasetCollectionScreen> {
     }
   }
 
-  Future<void> _captureAndAnnotate() async {
+  // Étape 1 : Juste prendre la photo (sans sauvegarder)
+  Future<void> _takePhoto() async {
     if (_controller == null || !_controller!.value.isInitialized || _isBusy) return;
+    
+    try {
+      final XFile photo = await _controller!.takePicture();
+      setState(() {
+        _tempImage = photo; // On passe en mode "Annotation"
+      });
+    } catch (e) {
+      debugPrint("Erreur capture: $e");
+    }
+  }
+
+  // Étape 2 : Sauvegarder après validation dans l'éditeur
+  Future<void> _saveData(List<Annotation> annotations, Size displaySize) async {
+    if (_tempImage == null) return;
     setState(() => _isBusy = true);
 
     try {
-      final XFile photo = await _controller!.takePicture();
       final directory = await getApplicationDocumentsDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
-      final String imgName = 'train_${timestamp}_$_selectedClass.jpg';
+      // Nom du fichier basé sur la première annotation (ou 'empty' si rien)
+      String primaryClass = annotations.isNotEmpty ? annotations.first.label : "empty";
+      final String imgName = 'train_${timestamp}_$primaryClass.jpg';
       final String imgPath = '${directory.path}/$imgName';
-      await photo.saveTo(imgPath);
 
-      int classId = _classes.indexOf(_selectedClass);
-      if (classId == -1) classId = 0;
+      // 1. Sauvegarde de l'image
+      await _tempImage!.saveTo(imgPath);
 
-      String yoloContent = "$classId 0.5 0.5 0.5 0.5";
-      final String txtName = 'train_${timestamp}_$_selectedClass.txt';
+      // 2. Génération du contenu YOLO
+      StringBuffer yoloContent = StringBuffer();
+      
+      for (var annotation in annotations) {
+        // Normalisation (Conversion Pixels -> 0.0 à 1.0)
+        // x_center, y_center, width, height
+        double w = annotation.rect.width / displaySize.width;
+        double h = annotation.rect.height / displaySize.height;
+        double x = (annotation.rect.left + annotation.rect.width / 2) / displaySize.width;
+        double y = (annotation.rect.top + annotation.rect.height / 2) / displaySize.height;
+
+        // Clamp pour éviter les erreurs d'arrondi (ex: 1.000001)
+        x = x.clamp(0.0, 1.0);
+        y = y.clamp(0.0, 1.0);
+        w = w.clamp(0.0, 1.0);
+        h = h.clamp(0.0, 1.0);
+
+        yoloContent.writeln("${annotation.classId} $x $y $w $h");
+      }
+
+      // 3. Sauvegarde du fichier texte
+      final String txtName = 'train_${timestamp}_$primaryClass.txt';
       final File txtFile = File('${directory.path}/$txtName');
-      await txtFile.writeAsString(yoloContent);
+      await txtFile.writeAsString(yoloContent.toString());
 
-      setState(() {
-        _photoCount++;
-        _isBusy = false;
-      });
+      await _countExistingPhotos();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Center(
-              child: Text(
-                "📸 Photo enregistrée pour '$_selectedClass' !",
-                textAlign: TextAlign.center, // Pour centrer si ça prend 2 lignes
-                style: const TextStyle(fontWeight: FontWeight.bold), // Petit bonus style
-              ),
-            ),
-            backgroundColor: Colors.green, // <--- On remet la couleur ici
-            duration: const Duration(milliseconds: 800), // Et la durée courte
+            content: Text("✅ Sauvegardé (${annotations.length} objets) !"),
+            backgroundColor: Colors.green,
+            duration: const Duration(milliseconds: 800),
           ),
         );
       }
     } catch (e) {
-      debugPrint("Erreur capture: $e");
-      setState(() => _isBusy = false);
+      debugPrint("Erreur sauvegarde: $e");
+      if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Erreur lors de la sauvegarde")));
+      }
+    } finally {
+      setState(() {
+        _tempImage = null; // Retour à la caméra
+        _isBusy = false;
+      });
     }
   }
 
@@ -276,28 +331,46 @@ class _DatasetCollectionScreenState extends State<DatasetCollectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 1. Si on a une image en attente ⮕ Mode Annotation
+    if (_tempImage != null) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          title: const Text("Annoter l'image"),
+          backgroundColor: Colors.black,
+          leading: IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () => setState(() => _tempImage = null), // Annuler et revenir caméra
+          ),
+        ),
+        body: AnnotationEditor(
+          imageFile: _tempImage!,
+          classes: _classes,
+          onValidated: _saveData, // C'est ici qu'on branche la sauvegarde
+        ),
+      );
+    }
+
+    // 2. Sinon ⮕ Mode Caméra (classique)
     if (_controller == null || !_controller!.value.isInitialized) {
       return const Scaffold(
-        backgroundColor: Colors.black, // Fond noir comme ton CameraScreen
+        backgroundColor: Colors.black,
         body: Center(child: CircularProgressIndicator(color: Colors.white)),
       );
     }
 
     return Scaffold(
-      backgroundColor: Colors.black, // Cohérence visuelle
+      backgroundColor: Colors.black,
       appBar: AppBar(
         title: const Text("Studio d'Entraînement 🧠"),
         backgroundColor: const Color(0xFF6A11CB),
         foregroundColor: Colors.white,
         actions: [
-          // NOUVEAU BOUTON : Galerie / Suppression
           IconButton(
             icon: const Icon(Icons.photo_library_outlined),
             tooltip: "Gérer les photos",
             onPressed: _showGallery,
           ),
-          
-          // Ton compteur existant
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Center(
@@ -312,34 +385,7 @@ class _DatasetCollectionScreenState extends State<DatasetCollectionScreen> {
       body: Column(
         children: [
           Expanded(
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                CameraPreview(_controller!),
-                ColorFiltered(
-                  colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.5), BlendMode.srcOut),
-                  child: Stack(
-                    children: [
-                      Container(decoration: const BoxDecoration(color: Colors.transparent, backgroundBlendMode: BlendMode.dstOut)),
-                      Center(child: Container(width: 280, height: 280, decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(20)))),
-                    ],
-                  ),
-                ),
-                Center(
-                  child: Container(
-                    width: 280, height: 280,
-                    decoration: BoxDecoration(border: Border.all(color: Colors.greenAccent, width: 3), borderRadius: BorderRadius.circular(20)),
-                    child: const Align(
-                      alignment: Alignment.topCenter,
-                      child: Padding(
-                        padding: EdgeInsets.only(top: 8.0),
-                        child: Text("Placez l'objet ICI", style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, backgroundColor: Colors.black45)),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            child: CameraPreview(_controller!),
           ),
           Container(
             padding: const EdgeInsets.all(20),
@@ -347,52 +393,36 @@ class _DatasetCollectionScreenState extends State<DatasetCollectionScreen> {
               color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+            child: Row(
               children: [
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(
-                    labelText: "Quel objet scannez-vous ?",
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.tag, color: Color(0xFF6A11CB)),
+                Expanded(
+                  flex: 1,
+                  child: ElevatedButton.icon(
+                    onPressed: (_photoCount > 0 && !_isBusy) ? _syncDatasetToFirebase : null,
+                    icon: const Icon(Icons.cloud_upload),
+                    label: const Text("Exporter"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blueAccent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                    ),
                   ),
-                  value: _selectedClass,
-                  items: _classes.map((String value) {
-                    return DropdownMenuItem<String>(value: value, child: Text(value));
-                  }).toList(),
-                  onChanged: (newValue) => setState(() => _selectedClass = newValue!),
                 ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 1,
-                      child: ElevatedButton.icon(
-                        onPressed: (_photoCount > 0 && !_isBusy) ? _syncDatasetToFirebase : null,
-                        icon: const Icon(Icons.cloud_upload),
-                        label: const Text("Exporter"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blueAccent,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                        ),
-                      ),
+                const SizedBox(width: 15),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton.icon(
+                    onPressed: !_isBusy ? _takePhoto : null,
+                    icon: _isBusy 
+                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+                      : const Icon(Icons.camera_alt),
+                    label: const Text("CAPTURER"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6A11CB),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
                     ),
-                    const SizedBox(width: 15),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton.icon(
-                        onPressed: !_isBusy ? _captureAndAnnotate : null,
-                        icon: _isBusy ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.camera_alt),
-                        label: Text(_isBusy ? "..." : "CAPTURER"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF6A11CB),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
