@@ -155,28 +155,45 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
         );
 
         if (detections.isNotEmpty) {
-          // Dessin des boîtes sur l'image
           for (var detection in detections) {
             final box = detection["box"];
+            
             final x1 = (box[0] as double).toInt();
             final y1 = (box[1] as double).toInt();
             final x2 = (box[2] as double).toInt();
             final y2 = (box[3] as double).toInt();
-
+            
             img.drawRect(
               fixedImage, 
               x1: x1, y1: y1, x2: x2, y2: y2, 
               color: img.ColorRgb8(255, 0, 0), 
-              thickness: 4
+              thickness: 3
             );
 
             final label = "${detection['tag']} ${(box[4] * 100).toStringAsFixed(0)}%";
+
+            int textWidth = label.length * 14 + 12; 
+            int textHeight = 30;
+            
+            int textY = y1 - textHeight;
+            if (textY < 0) textY = y1 + 4;
+            
+            img.fillRect(
+              fixedImage, 
+              x1: x1, 
+              y1: textY, 
+              x2: x1 + textWidth, 
+              y2: textY + textHeight, 
+              color: img.ColorRgb8(0, 0, 0)
+            );
+
             img.drawString(
               fixedImage, 
               label, 
               font: img.arial24, 
-              x: x1 + 5, y: y1 + 5, 
-              color: img.ColorRgb8(255, 0, 0)
+              x: x1 + 6, 
+              y: textY + 3, 
+              color: img.ColorRgb8(255, 255, 255)
             );
           }
 
