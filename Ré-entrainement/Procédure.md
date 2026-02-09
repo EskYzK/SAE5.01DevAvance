@@ -20,11 +20,11 @@ L'objectif est de capturer des images d'objets scolaires mal détectés pour enr
 
 1. Ouvrir l'application **Scolarize**.
 2. Aller dans **Plus d'options** > **Collecte de données**.
-3. **Sélectionner la classe** de l'objet à améliorer (ex: `ruler`, `pen`).
-4. **Placer l'objet** dans le viseur vert (Overlay).
-5. Prendre **10 à 20 photos** environ en variant légèrement :
+3. Prendre **10 à 20 photos** environ de l'objet/des objets à améliorer en variant légèrement :
     * L'angle de vue.
     * La rotation de l'objet.
+4. Après chaque photo, **dessiner un cadre** autour de chaque objet à détecter dans l'image.
+5. **Sélectionner la classe** de chaque objet à détecter dans l'image (ex: `ruler`, `pen`).
 6. Cliquer sur le bouton **Exporter** :
     * L'application envoie les images et leur annotation YOLO vers le dossier `annotated_pictures` de Firebase Storage.
     * *Note : Les fichiers locaux sont automatiquement supprimés après l'envoi pour libérer de l'espace sur le téléphone.*
