@@ -100,7 +100,7 @@ class HistoryScreen extends StatelessWidget {
                       data['label'] ?? "Objet",
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                     ),
-                    subtitle: Text("$dateStr\nConfiance: ${((data['confidence'] ?? 0) * 100).toStringAsFixed(1)}%"),
+                    subtitle: Text("$dateStr\nConfiance: ${(double.tryParse(data['confidence']?.toString() ?? '0') ?? 0 * 100).toStringAsFixed(1)}%"),
                     isThreeLine: true,
                   ),
                 ),
