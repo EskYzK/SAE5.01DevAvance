@@ -228,16 +228,19 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
     if (!mounted) return;
 
     String label = "Objet inconnu";
-    double confidence = 0.0;
+    double confidence = "0.0";
     
     if (detections.isNotEmpty) {
-      label = detections[0]['tag'];
-      confidence = detections[0]['box'][4];
+      label = detections.map((d) => d['tag'].toString()).join(', ');
+
+      confidence = uniqueDetections
+          .map((d) => (d['box'][4] as num).toDouble().toStringAsFixed(2))
+          .join(', ');
     }
 
     showDialog(
       context: context,
-      barrierDismissible: false, // On force le choix
+      barrierDismissible: false, 
       builder: (ctx) => AlertDialog(
         title: const Text("Sauvegarder ?"),
         content: Column(
@@ -245,7 +248,8 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
           children: [
             Image.file(imageFile, height: 150),
             const SizedBox(height: 10),
-            Text("Objet détecté : $label"),
+            // Le texte affichera maintenant "Objet détecté : Chaise, Table, ..."
+            Text("Objet détecté : $label"), 
             const SizedBox(height: 5),
             const Text("Où voulez-vous envoyer cette image ?", style: TextStyle(fontSize: 12, color: Colors.grey)),
           ],
