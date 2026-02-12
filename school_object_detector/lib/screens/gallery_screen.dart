@@ -154,11 +154,14 @@ class _GalleryScreenState extends State<GalleryScreen> {
     if (!mounted) return;
 
     String label = "Objet inconnu";
-    double confidence = 0.0;
+    String confidence = "0.0";
     
     if (detections.isNotEmpty) {
-      label = detections[0]['tag'];
-      confidence = detections[0]['box'][4];
+      label = detections.map((d) => d['tag'].toString()).join(', ');
+
+      confidence = detections
+          .map((d) => (d['box'][4] as num).toDouble().toStringAsFixed(2))
+          .join(', ');
     }
 
     showDialog(
