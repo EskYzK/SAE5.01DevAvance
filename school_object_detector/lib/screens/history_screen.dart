@@ -52,9 +52,11 @@ class HistoryScreen extends StatelessWidget {
               var data = doc.data() as Map<String, dynamic>;
 
               String rawConf = data['confidence']?.toString() ?? '0';
-              rawConf = rawConf.replaceAll(',', '.');
-              double confValue = double.tryParse(rawConf) ?? 0.0;
-              String confDisplay = (confValue * 100).toStringAsFixed(1);
+              List<String> confList = rawConf.split(',');
+              String confDisplay = confList.map((c) {
+                double val = double.tryParse(c.trim().replaceAll(',', '.')) ?? 0.0;
+                return "${(val * 100).toStringAsFixed(1)}%";
+              }).join(', ');
 
               String dateStr = "Date inconnue";
               if (data['timestamp'] != null) {
@@ -105,7 +107,7 @@ class HistoryScreen extends StatelessWidget {
                       data['label'] ?? "Objet",
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                     ),
-                    subtitle: Text("$dateStr\nConfiance: $confDisplay%"), 
+                    subtitle: Text("$dateStr\nConfiance: $confDisplay"), 
                     isThreeLine: true,
                   ),
                 ),

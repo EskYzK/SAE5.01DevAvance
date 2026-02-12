@@ -44,9 +44,23 @@ class CommunityScreen extends StatelessWidget {
             padding: const EdgeInsets.only(top: 10, bottom: 20),
             itemCount: docs.length,
             itemBuilder: (context, index) {
+
               final data = docs[index].data() as Map<String, dynamic>;
               
-              // Récupération sécurisée des données
+              final dynamic rawConfidence = data['confidence'];
+              String confString = rawConfidence?.toString() ?? '0';
+              List<String> confParts = confString.split(',');
+
+              String displayConfidence = confParts.map((part) {
+                double val = double.tryParse(part.trim().replaceAll(',', '.')) ?? 0.0;
+                return "${(val * 100).toStringAsFixed(1)}%";
+              }).join(', ');
+
+              double mainConfidence = 0.0;
+              if (confParts.isNotEmpty) {
+                mainConfidence = double.tryParse(confParts[0].trim().replaceAll(',', '.')) ?? 0.0;
+              }
+
               final String? imageUrl = data['imageUrl'];
               final String label = data['label'] ?? 'Objet inconnu';
               final double confidence = double.tryParse(data['confidence']?.toString() ?? '0.0') ?? 0.0;
@@ -139,9 +153,10 @@ class CommunityScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                "Confiance IA : ${(confidence * 100).toStringAsFixed(1)}%",
+                                "Confiance IA : $displayConfidence", // Affiche "95.0%, 82.0%"
                                 style: TextStyle(
-                                  color: confidence > 0.8 ? Colors.green : Colors.orange,
+                                  // Utilise mainConfidence (le premier objet) pour la couleur
+                                  color: mainConfidence > 0.8 ? Colors.green : Colors.orange,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 13,
                                 ),
