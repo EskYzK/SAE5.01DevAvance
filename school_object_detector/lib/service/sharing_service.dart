@@ -16,7 +16,7 @@ class SharingService {
   Future<void> shareDetection({
     required File imageFile,
     required String label,
-    required double confidence,
+    required String confidence,
   }) async {
     try {
       User? user = _auth.currentUser;

@@ -233,7 +233,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
     if (detections.isNotEmpty) {
       label = detections.map((d) => d['tag'].toString()).join(', ');
 
-      confidence = uniqueDetections
+      confidence = detections
           .map((d) => (d['box'][4] as num).toDouble().toStringAsFixed(2))
           .join(', ');
     }
@@ -288,7 +288,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
     );
   }
 
-  Future<void> _saveToHistory(File imageFile, String label, double confidence) async {
+  Future<void> _saveToHistory(File imageFile, String label, String confidence) async {
     try {
       await HistoryService().saveDetection(
         imageFile: imageFile,
