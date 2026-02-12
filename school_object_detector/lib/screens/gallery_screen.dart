@@ -213,7 +213,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
     );
   }
 
-  Future<void> _saveToCloudHistory(File imageFile, String label, double confidence) async {
+  Future<void> _saveToCloudHistory(File imageFile, String label, String confidence) async {
     try {
       await HistoryService().saveDetection(
         imageFile: imageFile,
@@ -235,7 +235,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
     }
   }
 
-  Future<void> _shareToCommunity(File imageFile, String label, double confidence) async {
+  Future<void> _shareToCommunity(File imageFile, String label, String confidence) async {
     try {
       await SharingService().shareDetection(
         imageFile: imageFile,
