@@ -63,7 +63,6 @@ class CommunityScreen extends StatelessWidget {
 
               final String? imageUrl = data['imageUrl'];
               final String label = data['label'] ?? 'Objet inconnu';
-              final double confidence = double.tryParse(data['confidence']?.toString() ?? '0.0') ?? 0.0;
               final String userPseudo = data['userPseudo'] ?? 'Anonyme';
               final String docId = docs[index].id;
 
