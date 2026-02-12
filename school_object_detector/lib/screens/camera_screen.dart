@@ -305,7 +305,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
     }
   }
 
-  Future<void> _shareToCommunity(File imageFile, String label, double confidence) async {
+  Future<void> _shareToCommunity(File imageFile, String label, String confidence) async {
     try {
       await SharingService().shareDetection(
         imageFile: imageFile,
