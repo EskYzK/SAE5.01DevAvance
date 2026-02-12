@@ -388,43 +388,48 @@ class _DatasetCollectionScreenState extends State<DatasetCollectionScreen> {
             child: CameraPreview(_controller!),
           ),
           Container(
-            padding: const EdgeInsets.all(20),
             decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 1,
-                  child: ElevatedButton.icon(
-                    onPressed: (_photoCount > 0 && !_isBusy) ? _syncDatasetToFirebase : null,
-                    icon: const Icon(Icons.cloud_upload),
-                    label: const Text("Exporter"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blueAccent,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 15),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.all(20), 
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: ElevatedButton.icon(
+                        onPressed: (_photoCount > 0 && !_isBusy) ? _syncDatasetToFirebase : null,
+                        icon: const Icon(Icons.cloud_upload),
+                        label: const Text("Exporter"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blueAccent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 15),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton.icon(
-                    onPressed: !_isBusy ? _takePhoto : null,
-                    icon: _isBusy 
-                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
-                      : const Icon(Icons.camera_alt),
-                    label: const Text("CAPTURER"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6A11CB),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 15),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        onPressed: !_isBusy ? _takePhoto : null,
+                        icon: _isBusy 
+                          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+                          : const Icon(Icons.camera_alt),
+                        label: const Text("CAPTURER"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6A11CB),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ],
