@@ -13,7 +13,7 @@ class HistoryService {
   Future<void> saveDetection({
     required File imageFile,
     required String label,
-    required double confidence,
+    required String confidence,
   }) async {
     User? user = _auth.currentUser;
     if (user == null) throw Exception("Vous devez être connecté.");
