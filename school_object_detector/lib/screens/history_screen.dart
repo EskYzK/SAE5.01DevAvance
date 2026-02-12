@@ -51,6 +51,11 @@ class HistoryScreen extends StatelessWidget {
               var doc = snapshot.data!.docs[index];
               var data = doc.data() as Map<String, dynamic>;
 
+              String rawConf = data['confidence']?.toString() ?? '0';
+              rawConf = rawConf.replaceAll(',', '.');
+              double confValue = double.tryParse(rawConf) ?? 0.0;
+              String confDisplay = (confValue * 100).toStringAsFixed(1);
+
               String dateStr = "Date inconnue";
               if (data['timestamp'] != null) {
                 DateTime date = (data['timestamp'] as Timestamp).toDate();
@@ -100,7 +105,7 @@ class HistoryScreen extends StatelessWidget {
                       data['label'] ?? "Objet",
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                     ),
-                    subtitle: Text("$dateStr\nConfiance: ${(double.tryParse(data['confidence']?.toString() ?? '0') ?? 0 * 100).toStringAsFixed(1)}%"),
+                    subtitle: Text("$dateStr\nConfiance: $confDisplay%"), 
                     isThreeLine: true,
                   ),
                 ),
