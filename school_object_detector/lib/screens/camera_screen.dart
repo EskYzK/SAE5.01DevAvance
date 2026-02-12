@@ -228,7 +228,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
     if (!mounted) return;
 
     String label = "Objet inconnu";
-    double confidence = "0.0";
+    String confidence = "0.0";
     
     if (detections.isNotEmpty) {
       label = detections.map((d) => d['tag'].toString()).join(', ');
