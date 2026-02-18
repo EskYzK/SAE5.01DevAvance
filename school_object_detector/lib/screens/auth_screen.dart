@@ -272,7 +272,29 @@ class _AuthScreenState extends State<AuthScreen> {
                   ),
                   child: Text(_isLogin ? "SE CONNECTER" : "S'INSCRIRE"),
                 ),
-              
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.login), // Ou utilise le logo Google si tu as l'asset !
+                  label: const Text('Se connecter avec Google'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black, // Style typique des boutons Google
+                  ),
+                  onPressed: () async {
+                    // Affiche un loader si nécessaire
+                    final userCredential = await AuthService().signInWithGoogle();
+                    
+                    if (userCredential != null) {
+                      // Succès ! Redirige vers ton HomeScreen
+                      Navigator.pushReplacementNamed(context, '/home'); // Modifie selon tes routes
+                    } else {
+                      // Affiche une SnackBar d'erreur
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('La connexion a échoué ou a été annulée.')),
+                      );
+                    }
+                  },
+                ),
+            
               const SizedBox(height: 20),
 
               TextButton(
